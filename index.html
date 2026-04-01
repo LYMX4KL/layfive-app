@@ -180,7 +180,7 @@ button{font-family:inherit}
     <div class="split-left">
       <table class="sc"><thead><tr>
         <th class="rn">#</th><th class="sn">D</th>
-        <th class="hM el">金</th><th class="hW el">木</th><th class="hWa el">水</th><th class="hF el">火</th><th class="hE el">土</th>
+        <th class="hM el">é</th><th class="hW el">æ¨</th><th class="hWa el">æ°´</th><th class="hF el">ç«</th><th class="hE el">å</th>
       </tr></thead><tbody id="scBody"></tbody></table>
     </div>
     <div class="split-right">
@@ -203,13 +203,13 @@ button{font-family:inherit}
 <div class="pane" id="p1" style="display:none">
   <div class="apanel">
     <div class="acard">
-      <h3>Element Hit Summary — <span id="aTotalSpins">0</span> spins</h3>
+      <h3>Element Hit Summary â <span id="aTotalSpins">0</span> spins</h3>
       <div class="ebox" id="aBoxes"></div>
       <div id="aBars"></div>
     </div>
     <div class="acard">
       <h3>Behind-Element Analysis</h3>
-      <p style="font-size:.7em;color:var(--dim);margin-bottom:5px">When straight hits fall behind splits → straight numbers tend to catch up.</p>
+      <p style="font-size:.7em;color:var(--dim);margin-bottom:5px">When straight hits fall behind splits â straight numbers tend to catch up.</p>
       <div id="aBehind"></div>
     </div>
     <div id="aRec" class="rec rec-go" style="display:none"></div>
@@ -256,8 +256,8 @@ button{font-family:inherit}
     <div class="acard">
       <h3>Add to Home Screen</h3>
       <p style="font-size:.8em;line-height:1.5;">
-        <strong>iPhone:</strong> Tap Share (⎗↑) → "Add to Home Screen"<br>
-        <strong>Android:</strong> Tap ⋮ → "Add to Home Screen"
+        <strong>iPhone:</strong> Tap Share (ââ) â "Add to Home Screen"<br>
+        <strong>Android:</strong> Tap â® â "Add to Home Screen"
       </p>
     </div>
   </div>
@@ -271,12 +271,12 @@ button{font-family:inherit}
 <script>
 // ===== FIREBASE CONFIG (to be filled in after project creation) =====
 const FIREBASE_CONFIG = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
+  apiKey: "AIzaSyB5hGf2p9COuUflhcfkJ_jp_cl-jCdMWmY",
+  authDomain: "layfive-app.firebaseapp.com",
+  projectId: "layfive-app",
+  storageBucket: "layfive-app.firebasestorage.app",
+  messagingSenderId: "417066746184",
+  appId: "1:417066746184:web:d2223e6a5e4300e9f5f37d"
 };
 
 let fb=null, auth=null, db=null, currentUser=null;
@@ -361,15 +361,15 @@ function showApp(user){
 
 // ===== LAYOUT DATA =====
 const L={
-  M:{n:'Metal 金',s:'金',c:'var(--m)',
+  M:{n:'Metal é',s:'é',c:'var(--m)',
     st:[1,2,9,10,14,18,20,24,27,28,31,32],sp:[[5,6],[19,22],[35,36]]},
-  W:{n:'Wood 木',s:'木',c:'var(--w)',
+  W:{n:'Wood æ¨',s:'æ¨',c:'var(--w)',
     st:[3,4,10,12,14,20,23,24,25,27,28,35],sp:[[8,9],[13,16],[32,33]]},
-  Wa:{n:'Water 水',s:'水',c:'var(--wa)',
+  Wa:{n:'Water æ°´',s:'æ°´',c:'var(--wa)',
     st:[3,4,9,11,14,16,20,24,26,30,31,34],sp:[[7,10],[15,18],[32,35]]},
-  F:{n:'Fire 火',s:'火',c:'var(--f)',
+  F:{n:'Fire ç«',s:'ç«',c:'var(--f)',
     st:[4,7,9,12,14,19,20,24,26,27,28,35],sp:[[1,2],[15,18],[31,32]]},
-  E:{n:'Earth 土',s:'土',c:'var(--e)',
+  E:{n:'Earth å',s:'å',c:'var(--e)',
     st:[4,5,9,11,15,17,19,23,27,28,33,34],sp:[[2,3],[13,16],[35,36]]}
 };
 const ELS=['M','W','Wa','F','E'];
@@ -583,7 +583,7 @@ function refreshLiveStats(){
       const diff=pct-EXP_HIT*100;
       let est, prob;
       if(Math.abs(diff)<3){
-        est='On target';prob='—';
+        est='On target';prob='â';
       }else if(diff<0){
         // Behind: estimate spins to catch up
         const deficit=Math.round(n*EXP_HIT)-d[el].t;
@@ -593,7 +593,7 @@ function refreshLiveStats(){
         est=`~${spinsNeeded} spins`;
         prob=`${pCatch}%`;
       }else{
-        est='Ahead +'+diff.toFixed(1)+'%';prob='—';
+        est='Ahead +'+diff.toFixed(1)+'%';prob='â';
       }
       catchH+=`<div class="catchup-row">
         <span class="el-s" style="color:${L[el].c}">${L[el].s}</span>
@@ -628,7 +628,7 @@ function refreshAnalysis(){
   ELS.forEach(el=>{
     const pct=(d[el].t/n*100);const diff=pct-48.65;
     const cls=Math.abs(diff)<5?'near':diff>0?'above':'below';
-    const arrow=diff>2?'▲':diff<-2?'▼':'●';
+    const arrow=diff>2?'â²':diff<-2?'â¼':'â';
     boxH+=`<div class="eb" style="border-color:${L[el].c}"><div class="val" style="color:${L[el].c}">${d[el].t}</div><div class="lbl">${d[el].s}S+${d[el].sp}Sp</div><div class="pct ${cls}">${pct.toFixed(1)}% ${arrow}</div></div>`;
   });
   document.getElementById('aBoxes').innerHTML=boxH;
@@ -649,12 +649,12 @@ function refreshAnalysis(){
     const behind=totalPct<48.65;const stBehind=stPct<expStPct;const spBehind=spPct<expSpPct;
     const stGap=(expStPct-stPct).toFixed(1);const spGap=(expSpPct-spPct).toFixed(1);
     let signal='',sigClass='';
-    if(behind&&stBehind&&!spBehind){signal='STRAIGHT DUE — splits OK, straight behind by '+stGap+'%';sigClass='signal-hot'}
+    if(behind&&stBehind&&!spBehind){signal='STRAIGHT DUE â splits OK, straight behind by '+stGap+'%';sigClass='signal-hot'}
     else if(behind&&stBehind&&spBehind&&parseFloat(stGap)>parseFloat(spGap)){signal='STRAIGHT MORE DUE ('+stGap+'% vs '+spGap+'%)';sigClass='signal-hot'}
-    else if(behind&&stBehind&&spBehind){signal='Both behind — S:-'+stGap+'% Sp:-'+spGap+'%';sigClass='signal-watch'}
-    else if(behind&&!stBehind){signal='Split behind — straight OK';sigClass='signal-watch'}
+    else if(behind&&stBehind&&spBehind){signal='Both behind â S:-'+stGap+'% Sp:-'+spGap+'%';sigClass='signal-watch'}
+    else if(behind&&!stBehind){signal='Split behind â straight OK';sigClass='signal-watch'}
     else{signal='On track or ahead';sigClass='signal-cold'}
-    behH+=`<div class="behind-row"><span class="el-name" style="color:${L[el].c}">${L[el].s} ${behind?'▼':'✓'}</span><span class="detail">S:${stPct.toFixed(1)}%/32.4 Sp:${spPct.toFixed(1)}%/16.2</span><span class="${sigClass}">${signal}</span></div>`;
+    behH+=`<div class="behind-row"><span class="el-name" style="color:${L[el].c}">${L[el].s} ${behind?'â¼':'â'}</span><span class="detail">S:${stPct.toFixed(1)}%/32.4 Sp:${spPct.toFixed(1)}%/16.2</span><span class="${sigClass}">${signal}</span></div>`;
   });
   document.getElementById('aBehind').innerHTML=behH;
 
@@ -662,10 +662,10 @@ function refreshAnalysis(){
   const rec=document.getElementById('aRec');rec.style.display='block';
   const behindEls=ELS.filter(el=>(d[el].t/n*100)<43);
   const hotEls=ELS.filter(el=>(d[el].t/n*100)>54);
-  if(n>=30&&behindEls.length>=2){rec.className='rec rec-go';rec.innerHTML='📊 '+behindEls.map(el=>L[el].s).join(',')+' behind — may be due for catch-up'}
-  else if(n>=30&&hotEls.length>=2){rec.className='rec rec-stop';rec.innerHTML='⚠️ Multiple elements hot — consider banking profits'}
-  else if(n>=40){rec.className='rec rec-wait';rec.innerHTML='🏧 '+n+' spins — approaching session end (30-40 recommended)'}
-  else if(n>=5){rec.className='rec rec-go';rec.innerHTML='▶ '+n+' spins. Need 20+ for patterns.'}
+  if(n>=30&&behindEls.length>=2){rec.className='rec rec-go';rec.innerHTML='ð '+behindEls.map(el=>L[el].s).join(',')+' behind â may be due for catch-up'}
+  else if(n>=30&&hotEls.length>=2){rec.className='rec rec-stop';rec.innerHTML='â ï¸ Multiple elements hot â consider banking profits'}
+  else if(n>=40){rec.className='rec rec-wait';rec.innerHTML='ð§ '+n+' spins â approaching session end (30-40 recommended)'}
+  else if(n>=5){rec.className='rec rec-go';rec.innerHTML='â¶ '+n+' spins. Need 20+ for patterns.'}
 
   // Straight vs Split table
   let svs='<table style="width:100%;border-collapse:collapse;font-size:.75em;color:var(--txt)"><tr><th style="text-align:left">Element</th><th>Straight</th><th>Exp</th><th>Gap</th><th>Split</th><th>Exp</th><th>Gap</th></tr>';
@@ -682,9 +682,9 @@ function refreshAnalysis(){
   ELS.forEach(el=>{
     const pct=(d[el].t/n*100);const diff=Math.abs(pct-48.65);
     let est;
-    if(diff<5)est='Near target ✓';
+    if(diff<5)est='Near target â';
     else{const target=18/37;const cur=d[el].t/n;const gap=Math.abs(cur-target);const needed=Math.round(gap*n/(0.05-gap+0.001));est='~'+Math.max(10,Math.min(200,needed))+' more spins'}
-    convH+=`<div class="bar-row"><span class="bar-el" style="color:${L[el].c}">${L[el].s}</span><span style="font-size:.8em;flex:1">${pct.toFixed(1)}% → ${est}</span></div>`;
+    convH+=`<div class="bar-row"><span class="bar-el" style="color:${L[el].c}">${L[el].s}</span><span style="font-size:.8em;flex:1">${pct.toFixed(1)}% â ${est}</span></div>`;
   });
   document.getElementById('aConv').innerHTML=convH;
 }
@@ -693,7 +693,7 @@ function refreshAnalysis(){
 function refreshSessions(){
   const div=document.getElementById('sessList');
   if(!sessions.length){div.innerHTML='<p style="color:var(--dim);font-size:.8em">No saved sessions.</p>';document.getElementById('sessOptimal').innerHTML='';return}
-  let h='<table class="sess-table"><tr><th>Date</th><th>Casino</th><th>Spins</th><th>金</th><th>木</th><th>水</th><th>火</th><th>土</th><th></th></tr>';
+  let h='<table class="sess-table"><tr><th>Date</th><th>Casino</th><th>Spins</th><th>é</th><th>æ¨</th><th>æ°´</th><th>ç«</th><th>å</th><th></th></tr>';
   sessions.forEach((s,i)=>{
     h+=`<tr><td>${s.date}</td><td>${s.casino}</td><td>${s.total}</td>`;
     ELS.forEach(el=>{const e=s.elements[el]||{s:0,sp:0};h+=`<td>${e.s}+${e.sp}</td>`});
@@ -763,7 +763,7 @@ async function loadCommunityStats(){
     let h=`<p style="font-size:.85em;margin-bottom:6px"><strong>${players.size}</strong> players | <strong>${totalSess}</strong> sessions | <strong>${totalSpins}</strong> total spins</p>`;
     h+='<table style="width:100%;font-size:.75em;border-collapse:collapse;color:var(--txt)"><tr><th>Element</th><th>Hit%</th><th>Straight</th><th>Split</th></tr>';
     ELS.forEach(el=>{
-      const pct=totalSpins>0?(totals[el].t/totalSpins*100).toFixed(1):'—';
+      const pct=totalSpins>0?(totals[el].t/totalSpins*100).toFixed(1):'â';
       h+=`<tr><td style="color:${L[el].c};font-weight:700">${L[el].n}</td><td style="text-align:center">${pct}%</td><td style="text-align:center">${totals[el].s}</td><td style="text-align:center">${totals[el].sp}</td></tr>`;
     });
     h+='</table>';div.innerHTML=h;
