@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="LayFive">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1a1a2e">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.png">
+<title>LayFive</title>
+<style>
+:root{--m:#999;--w:#2a8a2a;--wa:#1a70c4;--f:#d03000;--e:#c49000;--bg:#1a1a2e;--card:#16213e;--acc:#0f3460;--txt:#e4e4e4;--gold:#ffd700;--dim:#888}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--txt);overflow-x:hidden;font-size:14px}
+button{font-family:inherit}
+
+/* === TOP BAR === */
+.top{background:#111;padding:6px 8px;display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:100;border-bottom:1px solid #333}
+.top .logo{color:var(--gold);font-weight:800;font-size:1.1em}
+.top input{padding:3px 6px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:.8em;width:90px}
+.top select{padding:3px 4px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:.8em}
+
+/* === TABS === */
+.tabs{display:flex;background:#111;border-bottom:2px solid var(--gold);position:sticky;top:37px;z-index:99}
+.tab{flex:1;padding:8px 4px;text-align:center;font-size:.8em;font-weight:600;color:var(--dim);background:transparent;border:none;cursor:pointer}
+.tab.on{color:var(--gold);border-bottom:2px solid var(--gold);margin-bottom:-2px}
+.pane{display:none}.pane.on{display:block}
+
+/* === NUMBER INPUT === */
+.nums{display:grid;grid-template-columns:repeat(10,1fr);gap:2px;padding:4px;background:#0a0a1a}
+.nb{height:30px;border:none;border-radius:4px;font-weight:700;font-size:.85em;cursor:pointer;color:#fff}
+.nb:active{opacity:.7}
+.nb.r{background:#b22222}.nb.b{background:#222}.nb.g{background:#1a7a3a}
+.actions{display:flex;gap:4px;padding:4px;background:#0a0a1a}
+.actions button{flex:1;padding:5px;border:none;border-radius:4px;font-weight:600;font-size:.75em;cursor:pointer}
+.btn-undo{background:#c44;color:#fff}.btn-new{background:#555;color:#fff}.btn-save{background:var(--gold);color:#000}
+
+/* === SCORECARD TABLE === */
+.sc-wrap{overflow-x:auto;padding:0 2px}
+.sc{border-collapse:collapse;width:100%;table-layout:fixed}
+.sc th{padding:2px 1px;font-size:.65em;font-weight:700;text-align:center;border:1px solid #ccc;background:#f0f0f0;color:#333}
+.sc td{padding:1px;text-align:center;border:1px solid #ddd;height:22px;font-size:.8em;color:#222;background:#fff}
+.sc .rn{width:18px;background:#f5f5f5;color:#aaa;font-size:.65em}
+.sc .sn{width:24px;background:#ffe;font-weight:700;font-size:.8em}
+.sc .el{width:24px}
+.sc .rl td{border-bottom:2.5px solid #c00}
+/* Element column backgrounds */
+.sc .cM{background:#f0f0f0}.sc .cW{background:#eaf5ea}.sc .cWa{background:#e6f0fb}.sc .cF{background:#fce8e4}.sc .cE{background:#fdf6e0}
+/* Header colors */
+.hM{background:#ddd!important;color:#555!important}.hW{background:#d5ecd5!important;color:#1a6a1a!important}
+.hWa{background:#d4e8f8!important;color:#1a60a0!important}.hF{background:#f5d5cc!important;color:#a02000!important}
+.hE{background:#f5ecc8!important;color:#8a6a00!important}
+/* Scorecard full width */
+.sc{width:auto;margin:0 auto}
+/* Hits */
+.h-s{font-weight:700}.h-sp{font-weight:700}
+.circ{display:inline-flex;width:18px;height:18px;border-radius:50%;border:2px solid #c00;align-items:center;justify-content:center;font-size:.75em}
+/* Spin number colors */
+.sn-r{background:#f8d7da!important}.sn-b{background:#d6d6d6!important}.sn-g{background:#d4edda!important}
+
+/* === ANALYSIS PANEL === */
+.apanel{padding:6px;background:var(--bg)}
+.acard{background:var(--card);border-radius:8px;padding:8px;margin-bottom:6px;border:1px solid #333}
+.acard h3{color:var(--gold);font-size:.85em;margin-bottom:5px}
+/* Element boxes */
+.ebox{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:6px}
+.eb{padding:5px 2px;border-radius:5px;text-align:center;border:1px solid}
+.eb .val{font-size:1.3em;font-weight:800}.eb .lbl{font-size:.55em;color:var(--dim)}.eb .pct{font-size:.75em;margin-top:1px}
+.above{color:#2ecc71}.below{color:#e74c3c}.near{color:var(--gold)}
+/* Bars */
+.bar-row{display:flex;align-items:center;gap:4px;margin:3px 0}
+.bar-el{width:16px;font-size:.7em;font-weight:700}
+.bar-bg{flex:1;height:14px;background:#333;border-radius:7px;position:relative;overflow:hidden}
+.bar-fill{height:100%;border-radius:7px;opacity:.75;transition:width .4s}
+.bar-exp{position:absolute;left:48.65%;top:0;height:100%;width:1.5px;background:var(--gold)}
+.bar-val{font-size:.65em;width:65px;text-align:right}
+/* Behind analysis */
+.behind-grid{display:grid;grid-template-columns:1fr;gap:4px}
+.behind-row{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:5px;background:rgba(255,255,255,.03);font-size:.8em}
+.behind-row .el-name{width:50px;font-weight:700}
+.behind-row .detail{flex:1;font-size:.85em}
+.signal-hot{color:#2ecc71;font-weight:700}.signal-watch{color:#f1c40f;font-weight:700}.signal-cold{color:#e74c3c;font-weight:700}
+/* Recommendation */
+.rec{padding:8px;border-radius:6px;text-align:center;font-weight:600;font-size:.85em;margin:6px 0}
+.rec-go{background:rgba(46,204,113,.15);border:1px solid #2ecc71;color:#2ecc71}
+.rec-wait{background:rgba(241,196,15,.15);border:1px solid #f1c40f;color:#f1c40f}
+.rec-stop{background:rgba(231,76,60,.15);border:1px solid #e74c3c;color:#e74c3c}
+
+/* === SESSIONS TAB === */
+.sess-form{padding:8px}.sess-form label{font-size:.8em;color:var(--dim)}
+.sess-form input{padding:4px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:.85em;width:60px}
+.sess-table{width:100%;border-collapse:collapse;font-size:.7em;color:var(--txt)}
+.sess-table th{background:var(--acc);padding:4px;text-align:center}.sess-table td{padding:3px;text-align:center;border-bottom:1px solid #333}
+
+/* === RESPONSIVE === */
+@media(max-width:420px){.sc .el{width:22px}.sc .sn{width:24px}.sc .rn{width:18px}.sc td{font-size:.7em;height:20px}.circ{width:15px;height:15px;font-size:.65em;border-width:1.5px}}
+@media(min-width:700px){body{max-width:700px;margin:0 auto}}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="top">
+  <span class="logo">LayFive</span>
+  <input type="date" id="iDate">
+  <input type="text" id="iCasino" placeholder="Casino" style="width:60px">
+  <select id="iPage" onchange="goPage()"></select>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab on" onclick="showTab(0)">Scorecard</button>
+  <button class="tab" onclick="showTab(1)">Analysis</button>
+  <button class="tab" onclick="showTab(2)">Sessions</button>
+</div>
+
+<!-- ==================== SCORECARD TAB ==================== -->
+<div class="pane on" id="p0">
+  <!-- Number buttons -->
+  <div class="nums" id="numGrid"></div>
+  <div class="actions">
+    <button class="btn-undo" onclick="undo()">↩ Undo</button>
+    <button class="btn-new" onclick="newSess()">New</button>
+    <button class="btn-save" onclick="saveSess()">Save Session</button>
+  </div>
+  <!-- Scorecard -->
+  <div class="sc-wrap">
+    <table class="sc"><thead><tr>
+      <th class="rn">#</th><th class="sn">Drop</th>
+      <th class="hM el">金</th><th class="hW el">木</th><th class="hWa el">水</th><th class="hF el">火</th><th class="hE el">土</th>
+    </tr></thead><tbody id="scBody"></tbody></table>
+  </div>
+</div>
+
+<!-- ==================== ANALYSIS TAB ==================== -->
+<div class="pane" id="p1">
+  <div class="apanel">
+    <!-- Summary boxes -->
+    <div class="acard">
+      <h3>Element Hit Summary — <span id="aTotalSpins">0</span> spins</h3>
+      <div class="ebox" id="aBoxes"></div>
+      <div id="aBars"></div>
+    </div>
+    <!-- Behind element analysis -->
+    <div class="acard">
+      <h3>Behind-Element Analysis</h3>
+      <p style="font-size:.7em;color:var(--dim);margin-bottom:5px">Elements below expected %. When straight hits are behind more than splits → straight numbers tend to catch up.</p>
+      <div id="aBehind"></div>
+    </div>
+    <!-- Recommendation -->
+    <div id="aRec" class="rec rec-go" style="display:none"></div>
+    <!-- Straight vs Split detail -->
+    <div class="acard">
+      <h3>Straight vs Split Breakdown</h3>
+      <div id="aSvS"></div>
+    </div>
+    <!-- Convergence estimate -->
+    <div class="acard">
+      <h3>Spins to Converge (within 5% of expected)</h3>
+      <div id="aConv"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SESSIONS TAB ==================== -->
+<div class="pane" id="p2">
+  <div class="apanel">
+    <div class="acard">
+      <h3>Saved Sessions</h3>
+      <div id="sessList"></div>
+    </div>
+    <div class="acard">
+      <h3>Optimal Spin Analysis (All Sessions)</h3>
+      <p style="font-size:.7em;color:var(--dim);margin-bottom:5px">At which spin count did all elements come closest to their expected 48.65%?</p>
+      <div id="sessOptimal"></div>
+    </div>
+    <div class="acard">
+      <h3>Add to Home Screen</h3>
+      <p style="font-size:.8em;line-height:1.5;">
+        <strong>iPhone:</strong> Tap the Share button (□↑) → "Add to Home Screen"<br>
+        <strong>Android:</strong> Tap ⋮ menu → "Add to Home Screen"<br>
+        This creates a LayFive icon on your phone that opens full-screen!
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== CORRECT LAYOUT DATA (from reference cards) =====
+const L={
+  M:{n:'Metal 金',s:'金',c:'var(--m)',
+    st:[1,2,9,10,14,18,20,24,27,28,31,32],sp:[[5,6],[19,22],[35,36]]},
+  W:{n:'Wood 木',s:'木',c:'var(--w)',
+    st:[3,4,10,12,14,20,23,24,25,27,28,35],sp:[[8,9],[13,16],[32,33]]},
+  Wa:{n:'Water 水',s:'水',c:'var(--wa)',
+    st:[3,4,9,11,14,16,20,24,26,30,31,34],sp:[[7,10],[15,18],[32,35]]},
+  F:{n:'Fire 火',s:'火',c:'var(--f)',
+    st:[4,7,9,12,14,19,20,24,26,27,28,35],sp:[[1,2],[15,18],[31,32]]},
+  E:{n:'Earth 土',s:'土',c:'var(--e)',
+    st:[4,5,9,11,15,17,19,23,27,28,33,34],sp:[[2,3],[13,16],[35,36]]}
+};
+const ELS=['M','W','Wa','F','E'];
+const RED=[1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];
+const RPP=40; // rows per page
+
+function hitType(num,el){
+  if(L[el].st.includes(num))return 's';
+  for(const[a,b]of L[el].sp)if(num===a||num===b)return 'sp';
+  return'-';
+}
+
+// ===== STATE =====
+let spins=[]; // [{num, hits:{M:'s'|'sp'|'-', ...}}]
+let page=1;
+let sessions=[];
+try{sessions=JSON.parse(localStorage.getItem('lf_sess')||'[]')}catch(e){sessions=[]}
+
+// ===== INIT =====
+document.getElementById('iDate').valueAsDate=new Date();
+buildNums();
+buildRows();
+refreshAll();
+
+function buildNums(){
+  const g=document.getElementById('numGrid');
+  for(let i=0;i<=36;i++){
+    const b=document.createElement('button');
+    b.className='nb '+(i===0?'g':RED.includes(i)?'r':'b');
+    b.textContent=i;b.onclick=()=>addSpin(i);
+    g.appendChild(b);
+  }
+}
+
+function buildRows(){
+  const tb=document.getElementById('scBody');
+  tb.innerHTML='';
+  for(let r=1;r<=RPP;r++){
+    const tr=document.createElement('tr');
+    if(r===20)tr.className='rl';
+    tr.innerHTML=`<td class="rn">${r}</td><td class="sn" id="s${r}"></td>`+
+      `<td class="el cM" id="c${r}M"></td><td class="el cW" id="c${r}W"></td>`+
+      `<td class="el cWa" id="c${r}Wa"></td><td class="el cF" id="c${r}F"></td>`+
+      `<td class="el cE" id="c${r}E"></td>`;
+    tb.appendChild(tr);
+  }
+}
+
+function addSpin(num){
+  const hits={};
+  ELS.forEach(el=>hits[el]=hitType(num,el));
+  spins.push({num,hits});
+  // Auto-page
+  if(spins.length>(page)*RPP)page++;
+  refreshAll();
+  // Scroll to latest row
+  const row=((spins.length-1)%RPP)+1;
+  const cell=document.getElementById('s'+row);
+  if(cell)cell.scrollIntoView({block:'nearest'});
+}
+
+function undo(){if(spins.length){spins.pop();if(spins.length<=(page-1)*RPP&&page>1)page--;refreshAll()}}
+function newSess(){if(spins.length&&!confirm('Start new? Unsaved data will be lost.'))return;spins=[];page=1;refreshAll()}
+
+function saveSess(){
+  if(!spins.length){alert('No spins!');return}
+  const sess={date:document.getElementById('iDate').value||'Unknown',
+    casino:document.getElementById('iCasino').value||'-',
+    total:spins.length, spins:JSON.parse(JSON.stringify(spins)),
+    elements:{}};
+  ELS.forEach(el=>{
+    const s=spins.filter(x=>x.hits[el]==='s').length;
+    const sp=spins.filter(x=>x.hits[el]==='sp').length;
+    sess.elements[el]={s,sp,t:s+sp};
+  });
+  sessions.push(sess);
+  try{localStorage.setItem('lf_sess',JSON.stringify(sessions))}catch(e){}
+  alert('Saved! ('+spins.length+' spins)');
+}
+
+function goPage(){page=parseInt(document.getElementById('iPage').value)||1;refreshScorecard()}
+
+function showTab(i){
+  document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('on',j===i));
+  document.querySelectorAll('.pane').forEach((p,j)=>p.classList.toggle('on',j===i));
+  if(i===1)refreshAnalysis();
+  if(i===2)refreshSessions();
+}
+
+// ===== REFRESH ALL =====
+function refreshAll(){refreshPageSelect();refreshScorecard();refreshAnalysis()}
+
+function refreshPageSelect(){
+  const sel=document.getElementById('iPage');
+  const tp=Math.max(1,Math.ceil(spins.length/RPP));
+  sel.innerHTML='';
+  for(let i=1;i<=Math.max(tp,page);i++){
+    sel.innerHTML+=`<option value="${i}"${i===page?' selected':''}>P${i}</option>`;
+  }
+}
+
+// ===== SCORECARD =====
+function refreshScorecard(){
+  const off=(page-1)*RPP;
+  const pageSpins=spins.slice(off,off+RPP);
+  // Running counters from all spins before this page
+  const cnt={},cntS={},cntSp={};
+  ELS.forEach(el=>{cnt[el]=0;cntS[el]=0;cntSp[el]=0});
+  for(let i=0;i<off;i++){
+    ELS.forEach(el=>{
+      if(spins[i].hits[el]==='s'){cnt[el]++;cntS[el]++}
+      else if(spins[i].hits[el]==='sp'){cnt[el]++;cntSp[el]++}
+    });
+  }
+
+  for(let r=1;r<=RPP;r++){
+    const sp=pageSpins[r-1];
+    const sCell=document.getElementById('s'+r);
+    if(!sp){
+      sCell.textContent='';sCell.className='sn';
+      ELS.forEach(el=>{const c=document.getElementById('c'+r+el);c.innerHTML='';c.className='el c'+el});
+      continue;
+    }
+    // Spin number
+    sCell.textContent=sp.num;
+    sCell.className='sn '+(sp.num===0?'sn-g':RED.includes(sp.num)?'sn-r':'sn-b');
+    // Element cells
+    ELS.forEach(el=>{
+      const c=document.getElementById('c'+r+el);
+      c.className='el c'+el;
+      const type=sp.hits[el];
+      if(type==='s'){cnt[el]++;cntS[el]++;c.innerHTML=`<span class="h-s">${cnt[el]}</span>`}
+      else if(type==='sp'){cnt[el]++;cntSp[el]++;c.innerHTML=`<span class="h-sp"><span class="circ">${cnt[el]}</span></span>`}
+      else{c.innerHTML=''}
+    });
+    // (tally column removed)
+  }
+}
+
+// ===== ANALYSIS =====
+function refreshAnalysis(){
+  const n=spins.length;
+  document.getElementById('aTotalSpins').textContent=n;
+  if(!n){
+    document.getElementById('aBoxes').innerHTML='<span style="color:var(--dim);font-size:.8em">Record spins to see analysis</span>';
+    document.getElementById('aBars').innerHTML='';document.getElementById('aBehind').innerHTML='';
+    document.getElementById('aRec').style.display='none';document.getElementById('aSvS').innerHTML='';
+    document.getElementById('aConv').innerHTML='';return;
+  }
+
+  // Counts
+  const d={};
+  ELS.forEach(el=>{
+    const s=spins.filter(x=>x.hits[el]==='s').length;
+    const sp=spins.filter(x=>x.hits[el]==='sp').length;
+    d[el]={s,sp,t:s+sp};
+  });
+
+  // Summary boxes
+  let boxH='';
+  ELS.forEach(el=>{
+    const pct=(d[el].t/n*100);
+    const diff=pct-48.65;
+    const cls=Math.abs(diff)<5?'near':diff>0?'above':'below';
+    const arrow=diff>2?'▲':diff<-2?'▼':'●';
+    boxH+=`<div class="eb" style="border-color:${L[el].c}">
+      <div class="val" style="color:${L[el].c}">${d[el].t}</div>
+      <div class="lbl">${d[el].s}S+${d[el].sp}Sp</div>
+      <div class="pct ${cls}">${pct.toFixed(1)}% ${arrow}</div>
+    </div>`;
+  });
+  document.getElementById('aBoxes').innerHTML=boxH;
+
+  // Bars
+  let barH='';
+  ELS.forEach(el=>{
+    const pct=(d[el].t/n*100);const diff=(pct-48.65).toFixed(1);const sign=diff>=0?'+':'';
+    barH+=`<div class="bar-row"><span class="bar-el" style="color:${L[el].c}">${L[el].s}</span>
+      <div class="bar-bg"><div class="bar-fill" style="width:${Math.max(2,pct)}%;background:${L[el].c}"></div><div class="bar-exp"></div></div>
+      <span class="bar-val">${pct.toFixed(1)}% (${sign}${diff})</span></div>`;
+  });
+  document.getElementById('aBars').innerHTML=barH;
+
+  // Behind-element analysis
+  let behH='';
+  const expHitPct=48.65, expStPct=32.43, expSpPct=16.22;
+  ELS.forEach(el=>{
+    const totalPct=(d[el].t/n*100);
+    const stPct=(d[el].s/n*100);
+    const spPct=(d[el].sp/n*100);
+    const behind=totalPct<expHitPct;
+    const stBehind=stPct<expStPct;
+    const spBehind=spPct<expSpPct;
+    const stGap=(expStPct-stPct).toFixed(1);
+    const spGap=(expSpPct-spPct).toFixed(1);
+
+    let signal='',sigClass='';
+    if(behind && stBehind && !spBehind){
+      signal='STRAIGHT DUE — splits OK, straight behind by '+stGap+'%';sigClass='signal-hot';
+    }else if(behind && stBehind && spBehind && parseFloat(stGap)>parseFloat(spGap)){
+      signal='STRAIGHT MORE DUE — both behind but straight gap larger ('+stGap+'% vs '+spGap+'%)';sigClass='signal-hot';
+    }else if(behind && stBehind && spBehind){
+      signal='Both behind — straight -'+stGap+'%, split -'+spGap+'%';sigClass='signal-watch';
+    }else if(behind && !stBehind){
+      signal='Split behind — straight OK';sigClass='signal-watch';
+    }else{
+      signal='On track or ahead';sigClass='signal-cold';
+    }
+
+    behH+=`<div class="behind-row">
+      <span class="el-name" style="color:${L[el].c}">${L[el].s} ${behind?'▼':'✓'}</span>
+      <span class="detail">S:${stPct.toFixed(1)}%<span style="color:var(--dim)">/32.4</span> Sp:${spPct.toFixed(1)}%<span style="color:var(--dim)">/16.2</span></span>
+      <span class="${sigClass}">${signal}</span>
+    </div>`;
+  });
+  document.getElementById('aBehind').innerHTML=behH;
+
+  // Recommendation
+  const rec=document.getElementById('aRec');
+  rec.style.display='block';
+  const behindEls=ELS.filter(el=>(d[el].t/n*100)<43);
+  const hotEls=ELS.filter(el=>(d[el].t/n*100)>54);
+  if(n>=30 && behindEls.length>=2){
+    rec.className='rec rec-go';
+    rec.innerHTML='📊 '+behindEls.map(el=>L[el].s).join(',')+' behind — these elements may be due for a catch-up streak';
+  }else if(n>=30 && hotEls.length>=2){
+    rec.className='rec rec-stop';
+    rec.innerHTML='⚠️ Multiple elements running hot — consider banking profits';
+  }else if(n>=40){
+    rec.className='rec rec-wait';
+    rec.innerHTML='🎯 '+n+' spins played — approaching typical session length (30-40 spins recommended)';
+  }else if(n>=5){
+    rec.className='rec rec-go';
+    rec.innerHTML='▶ Recording... '+n+' spins. Need 20+ for meaningful patterns.';
+  }
+
+  // Straight vs Split table
+  let svs='<table style="width:100%;border-collapse:collapse;font-size:.75em;color:var(--txt)"><tr><th style="text-align:left">Element</th><th>Straight</th><th>Exp</th><th>Gap</th><th>Split</th><th>Exp</th><th>Gap</th></tr>';
+  ELS.forEach(el=>{
+    const stPct=(d[el].s/n*100);const spPct=(d[el].sp/n*100);
+    const stExp=(n*12/37).toFixed(1);const spExp=(n*6/37).toFixed(1);
+    const stGap=d[el].s-Math.round(n*12/37);const spGap=d[el].sp-Math.round(n*6/37);
+    svs+=`<tr><td style="color:${L[el].c};font-weight:700">${L[el].n}</td>
+      <td style="text-align:center">${d[el].s} (${stPct.toFixed(1)}%)</td><td style="text-align:center;color:var(--dim)">${stExp}</td>
+      <td style="text-align:center;color:${stGap>=0?'#2ecc71':'#e74c3c'}">${stGap>=0?'+':''}${stGap}</td>
+      <td style="text-align:center">${d[el].sp} (${spPct.toFixed(1)}%)</td><td style="text-align:center;color:var(--dim)">${spExp}</td>
+      <td style="text-align:center;color:${spGap>=0?'#2ecc71':'#e74c3c'}">${spGap>=0?'+':''}${spGap}</td></tr>`;
+  });
+  svs+='</table>';
+  document.getElementById('aSvS').innerHTML=svs;
+
+  // Convergence estimate
+  let convH='';
+  ELS.forEach(el=>{
+    const pct=(d[el].t/n*100);const diff=Math.abs(pct-48.65);
+    let est;
+    if(diff<5)est='Near target ✓';
+    else{
+      // Rough: how many more spins to bring within 5%
+      const target=18/37;const cur=d[el].t/n;
+      const gap=Math.abs(cur-target);
+      const needed=Math.round(gap*n/(0.05-gap+0.001));
+      est='~'+Math.max(10,Math.min(200,needed))+' more spins';
+    }
+    convH+=`<div class="bar-row"><span class="bar-el" style="color:${L[el].c}">${L[el].s}</span>
+      <span style="font-size:.8em;flex:1">${pct.toFixed(1)}% → ${est}</span></div>`;
+  });
+  document.getElementById('aConv').innerHTML=convH;
+}
+
+// ===== SESSIONS TAB =====
+function refreshSessions(){
+  const div=document.getElementById('sessList');
+  if(!sessions.length){div.innerHTML='<p style="color:var(--dim);font-size:.8em">No saved sessions.</p>';document.getElementById('sessOptimal').innerHTML='';return}
+
+  let h='<table class="sess-table"><tr><th>Date</th><th>Casino</th><th>Spins</th><th>金</th><th>木</th><th>水</th><th>火</th><th>土</th><th></th></tr>';
+  sessions.forEach((s,i)=>{
+    h+=`<tr><td>${s.date}</td><td>${s.casino}</td><td>${s.total}</td>`;
+    ELS.forEach(el=>{
+      const e=s.elements[el]||{s:0,sp:0};
+      h+=`<td>${e.s}+${e.sp}</td>`;
+    });
+    h+=`<td><button onclick="delSess(${i})" style="background:#c44;color:#fff;border:none;border-radius:3px;padding:2px 5px;cursor:pointer;font-size:.7em">X</button></td></tr>`;
+  });
+  h+='</table>';
+  div.innerHTML=h;
+
+  // Optimal spin analysis — find at which spin count all elements were closest to 48.65%
+  analyzeOptimalSpins();
+}
+
+function delSess(i){
+  if(!confirm('Delete session?'))return;
+  sessions.splice(i,1);
+  try{localStorage.setItem('lf_sess',JSON.stringify(sessions))}catch(e){}
+  refreshSessions();
+}
+
+function analyzeOptimalSpins(){
+  const div=document.getElementById('sessOptimal');
+  // Combine all spins from all sessions that have spin data
+  const allSpins=[];
+  sessions.forEach(s=>{if(s.spins)s.spins.forEach(sp=>allSpins.push(sp))});
+  // Also include current session
+  spins.forEach(sp=>allSpins.push(sp));
+
+  if(allSpins.length<10){div.innerHTML='<p style="color:var(--dim);font-size:.8em">Need more spin data (at least 10 spins across sessions).</p>';return}
+
+  // Calculate combined deviation at each spin count
+  const cnt={};ELS.forEach(el=>cnt[el]=0);
+  const target=18/37;
+  let bestSpin=0,bestDev=999;
+  const checkpoints=[];
+
+  for(let i=0;i<allSpins.length;i++){
+    const sp=allSpins[i];
+    ELS.forEach(el=>{if(sp.hits[el]!=='-')cnt[el]++});
+    const n=i+1;
+    // Total deviation: sum of |actual% - expected%| across all elements
+    let totalDev=0;
+    ELS.forEach(el=>{
+      const pct=cnt[el]/n;
+      totalDev+=Math.abs(pct-target);
+    });
+    if(n>=10 && totalDev<bestDev){bestDev=totalDev;bestSpin=n}
+    // Record checkpoints every 5 spins
+    if(n%5===0||n===allSpins.length){
+      const snap={};
+      ELS.forEach(el=>snap[el]=(cnt[el]/n*100).toFixed(1));
+      checkpoints.push({spin:n,dev:(totalDev/5*100).toFixed(1),snap});
+    }
+  }
+
+  let h=`<p style="font-size:.85em;margin-bottom:6px">Best convergence point: <strong style="color:var(--gold)">Spin #${bestSpin}</strong> (avg deviation: ${(bestDev/5*100).toFixed(1)}% per element)</p>`;
+  h+=`<p style="font-size:.75em;color:var(--dim);margin-bottom:4px">Combined deviation at checkpoints (lower = closer to expected):</p>`;
+  h+='<table class="sess-table"><tr><th>Spin</th><th>Avg Dev</th>';
+  ELS.forEach(el=>h+=`<th style="color:${L[el].c}">${L[el].s}</th>`);
+  h+='</tr>';
+  checkpoints.slice(-20).forEach(cp=>{
+    h+=`<tr${cp.spin===bestSpin?' style="background:rgba(255,215,0,.15)"':''}><td>${cp.spin}</td><td>${cp.dev}%</td>`;
+    ELS.forEach(el=>{
+      const v=parseFloat(cp.snap[el]);const diff=Math.abs(v-48.65);
+      h+=`<td style="color:${diff<5?'#2ecc71':diff<10?'#f1c40f':'#e74c3c'}">${cp.snap[el]}%</td>`;
+    });
+    h+='</tr>';
+  });
+  h+='</table>';
+  div.innerHTML=h;
+}
+</script>
+</body>
+</html>
