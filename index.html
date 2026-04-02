@@ -50,7 +50,7 @@ button{font-family:inherit}
 
 /* === TOP BAR === */
 .top{background:#111;padding:8px 10px;display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:100;border-bottom:1px solid #333;flex-wrap:wrap}
-.top .logo{color:var(--gold);font-weight:800;font-size:1.2em}
+.top .logo{height:28px;vertical-align:middle}
 .top input[type="date"]{padding:4px 6px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:.85em;width:auto}
 .top input[type="text"]{padding:4px 6px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:.85em;width:70px}
 .top select{padding:4px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:.85em}
@@ -148,6 +148,29 @@ button{font-family:inherit}
 .profile-wrap .btn-primary{display:block;width:100%;padding:12px;background:var(--gold);color:#000;font-weight:700;border:none;border-radius:8px;cursor:pointer;margin-top:12px}
 .profile-wrap .btn-danger{display:block;width:100%;padding:10px;background:#c44;color:#fff;font-weight:600;border:none;border-radius:8px;cursor:pointer;margin-top:10px}
 .profile-msg{font-size:.85em;margin-top:8px;min-height:20px}
+
+/* === COVER TAB === */
+.cover-wrap{padding:8px}
+.cover-elements{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.cover-el-btn{flex:1;min-width:55px;padding:10px 4px;border:2px solid;border-radius:8px;text-align:center;font-weight:800;font-size:1em;cursor:pointer;background:rgba(255,255,255,.05);color:var(--txt)}
+.cover-el-btn.active{background:rgba(255,255,255,.15);box-shadow:0 0 10px rgba(255,215,0,.3)}
+.cover-type-btns{display:flex;gap:6px;margin-bottom:12px}
+.cover-type-btn{flex:1;padding:8px;border:1px solid #555;border-radius:8px;background:#222;color:var(--txt);font-weight:600;font-size:.85em;cursor:pointer;text-align:center}
+.cover-type-btn.active{border-color:var(--gold);color:var(--gold);background:#2a2a1e}
+.roulette-table{display:grid;grid-template-columns:1fr repeat(3,1fr);gap:2px;max-width:360px;margin:0 auto}
+.rt-cell{height:38px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.95em;border-radius:4px;color:#fff;position:relative}
+.rt-zero{grid-column:1;grid-row:1/span 2;background:#1a7a3a;border-radius:6px;font-size:1.2em}
+.rt-red{background:#b22222}.rt-black{background:#333}
+.rt-cell.highlight{box-shadow:0 0 0 3px var(--gold),0 0 12px rgba(255,215,0,.5);z-index:1;transform:scale(1.08)}
+.rt-cell.split-highlight{box-shadow:0 0 0 3px #ff6600,0 0 12px rgba(255,102,0,.5);z-index:1;transform:scale(1.08)}
+.rt-cell.dim{opacity:.25}
+.cover-legend{display:flex;gap:12px;justify-content:center;margin:10px 0;font-size:.8em;color:var(--dim)}
+.cover-legend span{display:flex;align-items:center;gap:4px}
+.legend-box{width:14px;height:14px;border-radius:3px;display:inline-block}
+.cover-info{background:var(--card);border-radius:8px;padding:10px;margin-top:8px;text-align:center}
+.cover-info .count{font-size:1.8em;font-weight:800;color:var(--gold)}
+.cover-info .detail{font-size:.85em;color:var(--dim);margin-top:4px}
+.split-label{font-size:.7em;color:#ff6600;text-align:center;margin-top:2px}
 
 /* === RESPONSIVE === */
 @media(min-width:700px){body{max-width:700px;margin:0 auto}}
@@ -249,7 +272,7 @@ button{font-family:inherit}
 
 <!-- TOP BAR -->
 <div class="top">
-  <span class="logo">LayFive</span>
+  <img class="logo" src="icon.png" alt="LayFive">
   <input type="date" id="iDate">
   <input type="text" id="iCasino" placeholder="Casino" data-i18n-ph="casino_ph">
   <span class="spacer"></span>
@@ -260,9 +283,10 @@ button{font-family:inherit}
 <!-- TABS -->
 <div class="tabs">
   <button class="tab on" onclick="showTab(0)" data-i18n="tab_score">Scorecard</button>
-  <button class="tab" onclick="showTab(1)" data-i18n="tab_analysis">Analysis</button>
-  <button class="tab" onclick="showTab(2)" data-i18n="tab_sessions">Sessions</button>
-  <button class="tab" onclick="showTab(3)" data-i18n="tab_profile">Profile</button>
+  <button class="tab" onclick="showTab(1)" data-i18n="tab_cover">Cover</button>
+  <button class="tab" onclick="showTab(2)" data-i18n="tab_analysis">Analysis</button>
+  <button class="tab" onclick="showTab(3)" data-i18n="tab_sessions">Sessions</button>
+  <button class="tab" onclick="showTab(4)" data-i18n="tab_profile">Profile</button>
 </div>
 
 <!-- ==================== SCORECARD TAB ==================== -->
@@ -298,8 +322,37 @@ button{font-family:inherit}
   </div>
 </div>
 
-<!-- ==================== ANALYSIS TAB ==================== -->
+<!-- ==================== COVER TAB ==================== -->
 <div class="pane" id="p1">
+  <div class="cover-wrap">
+    <!-- Element selection -->
+    <div class="cover-elements" id="coverEls"></div>
+    <!-- Type buttons -->
+    <div class="cover-type-btns">
+      <button class="cover-type-btn active" onclick="setCoverType('full')" id="ctFull" data-i18n="cover_full">Full Set</button>
+      <button class="cover-type-btn" onclick="setCoverType('straight')" id="ctStraight" data-i18n="cover_straight">Straight</button>
+      <button class="cover-type-btn" onclick="setCoverType('split')" id="ctSplit" data-i18n="cover_split">Split</button>
+    </div>
+    <!-- Legend -->
+    <div class="cover-legend">
+      <span><span class="legend-box" style="box-shadow:0 0 0 2px var(--gold)"></span> <span data-i18n="cover_str_num">Straight</span></span>
+      <span><span class="legend-box" style="box-shadow:0 0 0 2px #ff6600"></span> <span data-i18n="cover_spl_num">Split</span></span>
+      <span><span class="legend-box" style="opacity:.25;background:#666"></span> <span data-i18n="cover_not">Not covered</span></span>
+    </div>
+    <!-- Roulette table -->
+    <div class="roulette-table" id="rouletteTable"></div>
+    <!-- Split pairs display -->
+    <div id="splitPairsDisplay" style="margin-top:10px"></div>
+    <!-- Info -->
+    <div class="cover-info" id="coverInfo">
+      <div class="count" id="coverCount">—</div>
+      <div class="detail" id="coverDetail" data-i18n="cover_select">Select an element above</div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== ANALYSIS TAB ==================== -->
+<div class="pane" id="p2">
   <div class="apanel">
     <div class="acard">
       <h3 data-i18n="hit_summary">Element Hit Summary</h3>
@@ -331,7 +384,7 @@ button{font-family:inherit}
 </div>
 
 <!-- ==================== SESSIONS TAB ==================== -->
-<div class="pane" id="p2">
+<div class="pane" id="p3">
   <div class="apanel">
     <div class="acard">
       <h3 data-i18n="saved_sessions">Saved Sessions</h3>
@@ -353,7 +406,7 @@ button{font-family:inherit}
 </div>
 
 <!-- ==================== PROFILE TAB ==================== -->
-<div class="pane" id="p3">
+<div class="pane" id="p4">
   <div class="profile-wrap">
     <h2 data-i18n="profile_title">Player Profile</h2>
     <label data-i18n="auth_name">Display Name</label>
@@ -422,7 +475,19 @@ const T = {
   tab_score: {en:'Scorecard', zh:'记分卡'},
   tab_analysis: {en:'Analysis', zh:'分析'},
   tab_sessions: {en:'Sessions', zh:'场次'},
+  tab_cover: {en:'Cover', zh:'覆盖'},
   tab_profile: {en:'Profile', zh:'个人资料'},
+  cover_full: {en:'Full Set (15u)', zh:'全套 (15注)'},
+  cover_straight: {en:'Straight (12u)', zh:'直注 (12注)'},
+  cover_split: {en:'Split (3u)', zh:'分注 (3注)'},
+  cover_str_num: {en:'Straight', zh:'直注'},
+  cover_spl_num: {en:'Split', zh:'分注'},
+  cover_not: {en:'Not covered', zh:'未覆盖'},
+  cover_select: {en:'Select an element above', zh:'请选择上方元素'},
+  cover_numbers: {en:'numbers to cover', zh:'个号码需覆盖'},
+  cover_units: {en:'units total', zh:'注总计'},
+  cover_straight_lbl: {en:'Straight bets (1u each)', zh:'直注 (每个1注)'},
+  cover_split_lbl: {en:'Split bets (1u each, covers 2 numbers)', zh:'分注 (每个1注，覆盖2个号码)'},
 
   // Scorecard
   casino_ph: {en:'Casino', zh:'赌场'},
@@ -799,8 +864,9 @@ function nextPage(){const tp=Math.max(1,Math.ceil(spins.length/RPP));if(page<tp)
 function showTab(i){
   document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('on',j===i));
   document.querySelectorAll('.pane').forEach((p,j)=>p.classList.toggle('on',j===i));
-  if(i===1)refreshAnalysis();
-  if(i===2)refreshSessions();
+  if(i===1)initCoverTab();
+  if(i===2)refreshAnalysis();
+  if(i===3)refreshSessions();
 }
 
 // ===== REFRESH ALL =====
@@ -1179,6 +1245,158 @@ function analyzeOptimalSpins(){
   });
   h+='</table>';
   div.innerHTML=h;
+}
+
+// ===== COVER TAB =====
+// Roulette table: standard layout 3 columns x 12 rows + 0
+const TABLE_LAYOUT = [
+  // [number, column(1-3), row(1-12)]
+  [3,3,1],[6,3,2],[9,3,3],[12,3,4],[15,3,5],[18,3,6],[21,3,7],[24,3,8],[27,3,9],[30,3,10],[33,3,11],[36,3,12],
+  [2,2,1],[5,2,2],[8,2,3],[11,2,4],[14,2,5],[17,2,6],[20,2,7],[23,2,8],[26,2,9],[29,2,10],[32,2,11],[35,2,12],
+  [1,1,1],[4,1,2],[7,1,3],[10,1,4],[13,1,5],[16,1,6],[19,1,7],[22,1,8],[25,1,9],[28,1,10],[31,1,11],[34,1,12]
+];
+
+let coverEl = null; // selected element key
+let coverType = 'full'; // 'full', 'straight', 'split'
+let coverInited = false;
+
+function initCoverTab(){
+  if(!coverInited){
+    buildCoverElements();
+    buildRouletteTable();
+    coverInited=true;
+  }
+}
+
+function buildCoverElements(){
+  const wrap=document.getElementById('coverEls');
+  wrap.innerHTML='';
+  ELS.forEach(el=>{
+    const btn=document.createElement('button');
+    btn.className='cover-el-btn';
+    btn.style.borderColor=L[el].c;
+    btn.style.color=L[el].c;
+    const eName=lang==='zh'?L[el].cn:L[el].n;
+    btn.innerHTML=L[el].s+'<br><span style="font-size:.6em;font-weight:400">'+eName+'</span>';
+    btn.onclick=()=>selectCoverEl(el);
+    btn.id='coverBtn_'+el;
+    wrap.appendChild(btn);
+  });
+}
+
+function buildRouletteTable(){
+  const grid=document.getElementById('rouletteTable');
+  grid.innerHTML='';
+  // Zero cell
+  const zero=document.createElement('div');
+  zero.className='rt-cell rt-zero dim';
+  zero.textContent='0';
+  zero.id='rt_0';
+  zero.style.gridColumn='1';
+  zero.style.gridRow='1 / span 12';
+  grid.appendChild(zero);
+
+  // Number cells - layout: col 1 (leftmost numbers), col 2, col 3 (rightmost)
+  TABLE_LAYOUT.forEach(([num,col,row])=>{
+    const cell=document.createElement('div');
+    const isRed=RED.includes(num);
+    cell.className='rt-cell '+(isRed?'rt-red':'rt-black')+' dim';
+    cell.textContent=num;
+    cell.id='rt_'+num;
+    cell.style.gridColumn=(col+1); // +1 because col 1 is zero
+    cell.style.gridRow=row;
+    grid.appendChild(cell);
+  });
+}
+
+function selectCoverEl(el){
+  coverEl=el;
+  // Update element buttons
+  ELS.forEach(e=>{
+    const btn=document.getElementById('coverBtn_'+e);
+    btn.classList.toggle('active',e===el);
+  });
+  updateCoverDisplay();
+}
+
+function setCoverType(type){
+  coverType=type;
+  document.getElementById('ctFull').classList.toggle('active',type==='full');
+  document.getElementById('ctStraight').classList.toggle('active',type==='straight');
+  document.getElementById('ctSplit').classList.toggle('active',type==='split');
+  updateCoverDisplay();
+}
+
+function updateCoverDisplay(){
+  if(!coverEl){return}
+
+  const el=coverEl;
+  const straightNums=L[el].st;
+  const splitPairs=L[el].sp;
+  const splitNums=[];
+  splitPairs.forEach(([a,b])=>{if(!splitNums.includes(a))splitNums.push(a);if(!splitNums.includes(b))splitNums.push(b)});
+
+  // Determine which numbers to highlight based on type
+  let showStraight=coverType==='full'||coverType==='straight';
+  let showSplit=coverType==='full'||coverType==='split';
+
+  // Reset all cells
+  for(let i=0;i<=36;i++){
+    const cell=document.getElementById('rt_'+i);
+    if(cell){
+      cell.className=cell.className.replace(/\s*(highlight|split-highlight|dim)/g,'');
+      cell.classList.add('dim');
+    }
+  }
+
+  // Highlight straight numbers
+  if(showStraight){
+    straightNums.forEach(num=>{
+      const cell=document.getElementById('rt_'+num);
+      if(cell){cell.classList.remove('dim');cell.classList.add('highlight')}
+    });
+  }
+
+  // Highlight split numbers
+  if(showSplit){
+    splitPairs.forEach(([a,b])=>{
+      const cellA=document.getElementById('rt_'+a);
+      const cellB=document.getElementById('rt_'+b);
+      if(cellA){cellA.classList.remove('dim');cellA.classList.add('split-highlight')}
+      if(cellB){cellB.classList.remove('dim');cellB.classList.add('split-highlight')}
+    });
+  }
+
+  // Split pairs display
+  const spDiv=document.getElementById('splitPairsDisplay');
+  if(showSplit){
+    let spH='<div style="text-align:center;margin-top:6px">';
+    spH+='<div style="font-size:.8em;color:var(--dim);margin-bottom:4px">'+t('cover_split_lbl')+'</div>';
+    spH+='<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">';
+    splitPairs.forEach(([a,b])=>{
+      spH+='<span style="background:#2a1a0a;border:2px solid #ff6600;border-radius:8px;padding:6px 12px;font-weight:700;font-size:1.1em;color:#ff6600">'+a+'/'+b+'</span>';
+    });
+    spH+='</div></div>';
+    spDiv.innerHTML=spH;
+  }else{
+    spDiv.innerHTML='';
+  }
+
+  // Update info
+  let totalNums=0,units=0;
+  if(coverType==='full'){totalNums=straightNums.length+splitNums.length;units=15}
+  else if(coverType==='straight'){totalNums=straightNums.length;units=12}
+  else{totalNums=splitNums.length;units=3}
+
+  // Remove duplicates (some numbers might be in both straight and split)
+  let allNums=[];
+  if(showStraight)allNums=allNums.concat(straightNums);
+  if(showSplit)allNums=allNums.concat(splitNums);
+  const uniqueNums=[...new Set(allNums)];
+
+  const eName=lang==='zh'?L[el].cn:L[el].n;
+  document.getElementById('coverCount').innerHTML='<span style="color:'+L[el].c+'">'+L[el].s+' '+eName+'</span>';
+  document.getElementById('coverDetail').innerHTML=uniqueNums.length+' '+t('cover_numbers')+' · '+units+' '+t('cover_units');
 }
 </script>
 </body>
