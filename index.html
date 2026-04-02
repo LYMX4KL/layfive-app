@@ -9,7 +9,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#1a1a2e">
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="LayFive Logo.png">
+<link rel="apple-touch-icon" href="icon.png">
 <title>LayFive</title>
 
 <!-- Firebase SDK -->
@@ -151,9 +151,12 @@ button{font-family:inherit}
 
 /* === COVER TAB === */
 .cover-wrap{padding:8px}
+.cover-step-label{font-size:.75em;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:8px 0 5px;padding-left:2px}
 .cover-elements{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
-.cover-el-btn{flex:1;min-width:55px;padding:10px 4px;border:2px solid;border-radius:8px;text-align:center;font-weight:800;font-size:1em;cursor:pointer;background:rgba(255,255,255,.05);color:var(--txt)}
+.cover-el-btn{flex:1;min-width:55px;padding:10px 4px;border:2px solid;border-radius:8px;text-align:center;font-weight:800;font-size:1em;cursor:pointer;background:rgba(255,255,255,.05);color:var(--txt);position:relative}
 .cover-el-btn.active{background:rgba(255,255,255,.15);box-shadow:0 0 10px rgba(255,215,0,.3)}
+.cover-tag{position:absolute;top:-6px;right:-4px;font-size:.55em;padding:1px 5px;border-radius:4px;font-weight:700;letter-spacing:.3px}
+.tag-hot{background:#2ecc71;color:#000}.tag-behind{background:#e74c3c;color:#fff}.tag-due{background:#f1c40f;color:#000}
 .cover-type-btns{display:flex;gap:6px;margin-bottom:12px}
 .cover-type-btn{flex:1;padding:8px;border:1px solid #555;border-radius:8px;background:#222;color:var(--txt);font-weight:600;font-size:.85em;cursor:pointer;text-align:center}
 .cover-type-btn.active{border-color:var(--gold);color:var(--gold);background:#2a2a1e}
@@ -325,20 +328,28 @@ button{font-family:inherit}
 <!-- ==================== COVER TAB ==================== -->
 <div class="pane" id="p1">
   <div class="cover-wrap">
-    <!-- Element selection -->
-    <div class="cover-elements" id="coverEls"></div>
-    <!-- Type buttons -->
-    <div class="cover-type-btns">
-      <button class="cover-type-btn active" onclick="setCoverType('full')" id="ctFull" data-i18n="cover_full">Full Set</button>
-      <button class="cover-type-btn" onclick="setCoverType('straight')" id="ctStraight" data-i18n="cover_straight">Straight</button>
-      <button class="cover-type-btn" onclick="setCoverType('split')" id="ctSplit" data-i18n="cover_split">Split</button>
+    <!-- Step 1: Main element -->
+    <div class="cover-step-label" data-i18n="cover_step1">STEP 1: Your Main Element (what you're chasing)</div>
+    <div class="cover-elements" id="coverMainEls"></div>
+
+    <!-- Step 2: Cover element with hot/behind tags -->
+    <div class="cover-step-label" id="coverStep2Label" style="display:none" data-i18n="cover_step2">STEP 2: Choose Covering Element</div>
+    <div class="cover-elements" id="coverSubEls" style="display:none"></div>
+
+    <!-- Step 3: Type buttons -->
+    <div class="cover-type-btns" id="coverTypeBtns" style="display:none">
+      <button class="cover-type-btn active" onclick="setCoverType('full')" id="ctFull" data-i18n="cover_full">Full Set (15u)</button>
+      <button class="cover-type-btn" onclick="setCoverType('straight')" id="ctStraight" data-i18n="cover_straight">Straight (12u)</button>
+      <button class="cover-type-btn" onclick="setCoverType('split')" id="ctSplit" data-i18n="cover_split">Split (3u)</button>
     </div>
+
     <!-- Legend -->
-    <div class="cover-legend">
-      <span><span class="legend-box" style="box-shadow:0 0 0 2px var(--gold)"></span> <span data-i18n="cover_str_num">Straight</span></span>
-      <span><span class="legend-box" style="box-shadow:0 0 0 2px #ff6600"></span> <span data-i18n="cover_spl_num">Split</span></span>
-      <span><span class="legend-box" style="opacity:.25;background:#666"></span> <span data-i18n="cover_not">Not covered</span></span>
+    <div class="cover-legend" id="coverLegend" style="display:none">
+      <span><span class="legend-box" style="box-shadow:0 0 0 2px var(--gold)"></span> <span data-i18n="cover_extra_str">Extra Straight</span></span>
+      <span><span class="legend-box" style="box-shadow:0 0 0 2px #ff6600"></span> <span data-i18n="cover_extra_spl">Extra Split</span></span>
+      <span><span class="legend-box" style="opacity:.25;background:#666"></span> <span data-i18n="cover_already">Already covered / Not needed</span></span>
     </div>
+
     <!-- Roulette table -->
     <div class="roulette-table" id="rouletteTable"></div>
     <!-- Split pairs display -->
@@ -346,7 +357,7 @@ button{font-family:inherit}
     <!-- Info -->
     <div class="cover-info" id="coverInfo">
       <div class="count" id="coverCount">—</div>
-      <div class="detail" id="coverDetail" data-i18n="cover_select">Select an element above</div>
+      <div class="detail" id="coverDetail" data-i18n="cover_select">Select your main element above to start</div>
     </div>
   </div>
 </div>
@@ -477,17 +488,22 @@ const T = {
   tab_sessions: {en:'Sessions', zh:'场次'},
   tab_cover: {en:'Cover', zh:'覆盖'},
   tab_profile: {en:'Profile', zh:'个人资料'},
-  cover_full: {en:'Full Set (15u)', zh:'全套 (15注)'},
-  cover_straight: {en:'Straight (12u)', zh:'直注 (12注)'},
-  cover_split: {en:'Split (3u)', zh:'分注 (3注)'},
-  cover_str_num: {en:'Straight', zh:'直注'},
-  cover_spl_num: {en:'Split', zh:'分注'},
-  cover_not: {en:'Not covered', zh:'未覆盖'},
-  cover_select: {en:'Select an element above', zh:'请选择上方元素'},
-  cover_numbers: {en:'numbers to cover', zh:'个号码需覆盖'},
-  cover_units: {en:'units total', zh:'注总计'},
-  cover_straight_lbl: {en:'Straight bets (1u each)', zh:'直注 (每个1注)'},
-  cover_split_lbl: {en:'Split bets (1u each, covers 2 numbers)', zh:'分注 (每个1注，覆盖2个号码)'},
+  cover_step1: {en:'STEP 1: Your Main Element (chasing)', zh:'第1步：主元素（追逐中）'},
+  cover_step2: {en:'STEP 2: Choose Covering Element', zh:'第2步：选择覆盖元素'},
+  cover_full: {en:'Full Set', zh:'全套'},
+  cover_straight: {en:'Straight Only', zh:'仅直注'},
+  cover_split: {en:'Split Only', zh:'仅分注'},
+  cover_extra_str: {en:'Extra Straight', zh:'额外直注'},
+  cover_extra_spl: {en:'Extra Split', zh:'额外分注'},
+  cover_already: {en:'Already covered', zh:'已覆盖'},
+  cover_select: {en:'Select your main element above to start', zh:'请先选择上方主元素'},
+  cover_pick_cover: {en:'Now pick a covering element', zh:'现在选择覆盖元素'},
+  cover_extra: {en:'extra numbers to place', zh:'个额外号码需下注'},
+  cover_extra_units: {en:'extra units needed', zh:'个额外注数'},
+  cover_split_lbl: {en:'Extra split bets to place:', zh:'额外分注需下注：'},
+  tag_hot: {en:'HOT', zh:'热'},
+  tag_behind: {en:'BEHIND', zh:'落后'},
+  tag_due: {en:'DUE', zh:'到期'},
 
   // Scorecard
   casino_ph: {en:'Casino', zh:'赌场'},
@@ -1248,74 +1264,91 @@ function analyzeOptimalSpins(){
 }
 
 // ===== COVER TAB =====
-// Roulette table: standard layout 3 columns x 12 rows + 0
 const TABLE_LAYOUT = [
-  // [number, column(1-3), row(1-12)]
   [3,3,1],[6,3,2],[9,3,3],[12,3,4],[15,3,5],[18,3,6],[21,3,7],[24,3,8],[27,3,9],[30,3,10],[33,3,11],[36,3,12],
   [2,2,1],[5,2,2],[8,2,3],[11,2,4],[14,2,5],[17,2,6],[20,2,7],[23,2,8],[26,2,9],[29,2,10],[32,2,11],[35,2,12],
   [1,1,1],[4,1,2],[7,1,3],[10,1,4],[13,1,5],[16,1,6],[19,1,7],[22,1,8],[25,1,9],[28,1,10],[31,1,11],[34,1,12]
 ];
 
-let coverEl = null; // selected element key
-let coverType = 'full'; // 'full', 'straight', 'split'
-let coverInited = false;
+let mainEl=null, coverSubEl=null, coverType='full', coverInited=false;
 
 function initCoverTab(){
-  if(!coverInited){
-    buildCoverElements();
-    buildRouletteTable();
-    coverInited=true;
-  }
+  if(!coverInited){buildRouletteTable();coverInited=true}
+  buildMainElements();
 }
 
-function buildCoverElements(){
-  const wrap=document.getElementById('coverEls');
+// Get all numbers covered by an element (straight + split)
+function getAllNums(el){
+  const nums=new Set(L[el].st);
+  L[el].sp.forEach(([a,b])=>{nums.add(a);nums.add(b)});
+  return nums;
+}
+
+function buildMainElements(){
+  const wrap=document.getElementById('coverMainEls');
   wrap.innerHTML='';
   ELS.forEach(el=>{
     const btn=document.createElement('button');
-    btn.className='cover-el-btn';
-    btn.style.borderColor=L[el].c;
-    btn.style.color=L[el].c;
+    btn.className='cover-el-btn'+(mainEl===el?' active':'');
+    btn.style.borderColor=L[el].c;btn.style.color=L[el].c;
     const eName=lang==='zh'?L[el].cn:L[el].n;
-    btn.innerHTML=L[el].s+'<br><span style="font-size:.6em;font-weight:400">'+eName+'</span>';
-    btn.onclick=()=>selectCoverEl(el);
-    btn.id='coverBtn_'+el;
+    btn.innerHTML=L[el].s+'<br><span style="font-size:.55em;font-weight:400">'+eName+'</span>';
+    btn.onclick=()=>selectMainEl(el);
     wrap.appendChild(btn);
   });
 }
 
-function buildRouletteTable(){
-  const grid=document.getElementById('rouletteTable');
-  grid.innerHTML='';
-  // Zero cell
-  const zero=document.createElement('div');
-  zero.className='rt-cell rt-zero dim';
-  zero.textContent='0';
-  zero.id='rt_0';
-  zero.style.gridColumn='1';
-  zero.style.gridRow='1 / span 12';
-  grid.appendChild(zero);
+function selectMainEl(el){
+  mainEl=el;coverSubEl=null;
+  buildMainElements();
+  buildSubElements();
+  document.getElementById('coverStep2Label').style.display='block';
+  document.getElementById('coverSubEls').style.display='flex';
+  document.getElementById('coverTypeBtns').style.display='none';
+  document.getElementById('coverLegend').style.display='none';
+  resetTable();
+  document.getElementById('splitPairsDisplay').innerHTML='';
+  document.getElementById('coverCount').innerHTML='<span style="color:'+L[el].c+'">'+L[el].s+' '+(lang==='zh'?L[el].cn:L[el].n)+'</span>';
+  document.getElementById('coverDetail').textContent=t('cover_pick_cover');
+}
 
-  // Number cells - layout: col 1 (leftmost numbers), col 2, col 3 (rightmost)
-  TABLE_LAYOUT.forEach(([num,col,row])=>{
-    const cell=document.createElement('div');
-    const isRed=RED.includes(num);
-    cell.className='rt-cell '+(isRed?'rt-red':'rt-black')+' dim';
-    cell.textContent=num;
-    cell.id='rt_'+num;
-    cell.style.gridColumn=(col+1); // +1 because col 1 is zero
-    cell.style.gridRow=row;
-    grid.appendChild(cell);
+function buildSubElements(){
+  const wrap=document.getElementById('coverSubEls');
+  wrap.innerHTML='';
+  const n=spins.length;
+  ELS.forEach(el=>{
+    if(el===mainEl)return; // can't cover with same element
+    const btn=document.createElement('button');
+    btn.className='cover-el-btn'+(coverSubEl===el?' active':'');
+    btn.style.borderColor=L[el].c;btn.style.color=L[el].c;
+    const eName=lang==='zh'?L[el].cn:L[el].n;
+    btn.innerHTML=L[el].s+'<br><span style="font-size:.55em;font-weight:400">'+eName+'</span>';
+
+    // Add hot/behind/due tags from analysis
+    if(n>=10){
+      const hits=spins.filter(x=>x.hits[el]!=='-').length;
+      const pct=hits/n*100;
+      const stHits=spins.filter(x=>x.hits[el]==='s').length;
+      const stPct=stHits/n*100;
+      if(pct>54){
+        btn.innerHTML+='<span class="cover-tag tag-hot">'+t('tag_hot')+'</span>';
+      }else if(stPct<(12/37)*85){
+        btn.innerHTML+='<span class="cover-tag tag-due">'+t('tag_due')+'</span>';
+      }else if(pct<43){
+        btn.innerHTML+='<span class="cover-tag tag-behind">'+t('tag_behind')+'</span>';
+      }
+    }
+
+    btn.onclick=()=>selectSubEl(el);
+    wrap.appendChild(btn);
   });
 }
 
-function selectCoverEl(el){
-  coverEl=el;
-  // Update element buttons
-  ELS.forEach(e=>{
-    const btn=document.getElementById('coverBtn_'+e);
-    btn.classList.toggle('active',e===el);
-  });
+function selectSubEl(el){
+  coverSubEl=el;
+  buildSubElements();
+  document.getElementById('coverTypeBtns').style.display='flex';
+  document.getElementById('coverLegend').style.display='flex';
   updateCoverDisplay();
 }
 
@@ -1327,76 +1360,95 @@ function setCoverType(type){
   updateCoverDisplay();
 }
 
-function updateCoverDisplay(){
-  if(!coverEl){return}
+function buildRouletteTable(){
+  const grid=document.getElementById('rouletteTable');
+  grid.innerHTML='';
+  const zero=document.createElement('div');
+  zero.className='rt-cell rt-zero dim';zero.textContent='0';zero.id='rt_0';
+  zero.style.gridColumn='1';zero.style.gridRow='1 / span 12';
+  grid.appendChild(zero);
+  TABLE_LAYOUT.forEach(([num,col,row])=>{
+    const cell=document.createElement('div');
+    cell.className='rt-cell '+(RED.includes(num)?'rt-red':'rt-black')+' dim';
+    cell.textContent=num;cell.id='rt_'+num;
+    cell.style.gridColumn=(col+1);cell.style.gridRow=row;
+    grid.appendChild(cell);
+  });
+}
 
-  const el=coverEl;
-  const straightNums=L[el].st;
-  const splitPairs=L[el].sp;
-  const splitNums=[];
-  splitPairs.forEach(([a,b])=>{if(!splitNums.includes(a))splitNums.push(a);if(!splitNums.includes(b))splitNums.push(b)});
-
-  // Determine which numbers to highlight based on type
-  let showStraight=coverType==='full'||coverType==='straight';
-  let showSplit=coverType==='full'||coverType==='split';
-
-  // Reset all cells
+function resetTable(){
   for(let i=0;i<=36;i++){
-    const cell=document.getElementById('rt_'+i);
-    if(cell){
-      cell.className=cell.className.replace(/\s*(highlight|split-highlight|dim)/g,'');
-      cell.classList.add('dim');
-    }
+    const c=document.getElementById('rt_'+i);
+    if(c){c.className=c.className.replace(/\s*(highlight|split-highlight|dim)/g,'');c.classList.add('dim')}
   }
+}
 
-  // Highlight straight numbers
-  if(showStraight){
-    straightNums.forEach(num=>{
-      const cell=document.getElementById('rt_'+num);
-      if(cell){cell.classList.remove('dim');cell.classList.add('highlight')}
-    });
-  }
+function updateCoverDisplay(){
+  if(!mainEl||!coverSubEl)return;
 
-  // Highlight split numbers
-  if(showSplit){
-    splitPairs.forEach(([a,b])=>{
-      const cellA=document.getElementById('rt_'+a);
-      const cellB=document.getElementById('rt_'+b);
-      if(cellA){cellA.classList.remove('dim');cellA.classList.add('split-highlight')}
-      if(cellB){cellB.classList.remove('dim');cellB.classList.add('split-highlight')}
-    });
-  }
+  // Get main element's full coverage (all numbers already bet on)
+  const mainNums=getAllNums(mainEl);
 
-  // Split pairs display
+  // Get covering element numbers by type
+  const covStraight=L[coverSubEl].st;
+  const covSplitPairs=L[coverSubEl].sp;
+  const covSplitNums=[];
+  covSplitPairs.forEach(([a,b])=>{covSplitNums.push(a);covSplitNums.push(b)});
+
+  const showStraight=coverType==='full'||coverType==='straight';
+  const showSplit=coverType==='full'||coverType==='split';
+
+  // Find EXTRA numbers not in main set
+  const extraStraight=showStraight?covStraight.filter(n=>!mainNums.has(n)):[];
+  const extraSplitPairs=showSplit?covSplitPairs.filter(([a,b])=>!mainNums.has(a)||!mainNums.has(b)):[];
+  const extraSplitNums=[];
+  extraSplitPairs.forEach(([a,b])=>{
+    if(!mainNums.has(a))extraSplitNums.push(a);
+    if(!mainNums.has(b))extraSplitNums.push(b);
+  });
+
+  // Reset table
+  resetTable();
+
+  // Highlight extra straights (gold)
+  extraStraight.forEach(num=>{
+    const c=document.getElementById('rt_'+num);
+    if(c){c.classList.remove('dim');c.classList.add('highlight')}
+  });
+
+  // Highlight extra splits (orange)
+  extraSplitPairs.forEach(([a,b])=>{
+    const cA=document.getElementById('rt_'+a);
+    const cB=document.getElementById('rt_'+b);
+    if(cA){cA.classList.remove('dim');cA.classList.add('split-highlight')}
+    if(cB){cB.classList.remove('dim');cB.classList.add('split-highlight')}
+  });
+
+  // Show extra split pairs below table
   const spDiv=document.getElementById('splitPairsDisplay');
-  if(showSplit){
+  if(showSplit&&extraSplitPairs.length){
     let spH='<div style="text-align:center;margin-top:6px">';
     spH+='<div style="font-size:.8em;color:var(--dim);margin-bottom:4px">'+t('cover_split_lbl')+'</div>';
     spH+='<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">';
-    splitPairs.forEach(([a,b])=>{
+    extraSplitPairs.forEach(([a,b])=>{
       spH+='<span style="background:#2a1a0a;border:2px solid #ff6600;border-radius:8px;padding:6px 12px;font-weight:700;font-size:1.1em;color:#ff6600">'+a+'/'+b+'</span>';
     });
     spH+='</div></div>';
     spDiv.innerHTML=spH;
-  }else{
-    spDiv.innerHTML='';
-  }
+  }else{spDiv.innerHTML=''}
 
-  // Update info
-  let totalNums=0,units=0;
-  if(coverType==='full'){totalNums=straightNums.length+splitNums.length;units=15}
-  else if(coverType==='straight'){totalNums=straightNums.length;units=12}
-  else{totalNums=splitNums.length;units=3}
+  // Count extra numbers and units
+  const allExtra=[...new Set([...extraStraight,...extraSplitNums])];
+  let extraUnits=extraStraight.length+extraSplitPairs.length;
 
-  // Remove duplicates (some numbers might be in both straight and split)
-  let allNums=[];
-  if(showStraight)allNums=allNums.concat(straightNums);
-  if(showSplit)allNums=allNums.concat(splitNums);
-  const uniqueNums=[...new Set(allNums)];
-
-  const eName=lang==='zh'?L[el].cn:L[el].n;
-  document.getElementById('coverCount').innerHTML='<span style="color:'+L[el].c+'">'+L[el].s+' '+eName+'</span>';
-  document.getElementById('coverDetail').innerHTML=uniqueNums.length+' '+t('cover_numbers')+' · '+units+' '+t('cover_units');
+  const mainName=lang==='zh'?L[mainEl].cn:L[mainEl].n;
+  const covName=lang==='zh'?L[coverSubEl].cn:L[coverSubEl].n;
+  document.getElementById('coverCount').innerHTML=
+    '<span style="color:'+L[mainEl].c+'">'+L[mainEl].s+'</span> + '+
+    '<span style="color:'+L[coverSubEl].c+'">'+L[coverSubEl].s+'</span>';
+  document.getElementById('coverDetail').innerHTML=
+    '<span style="color:var(--gold);font-weight:700">'+allExtra.length+'</span> '+t('cover_extra')+
+    ' · <span style="color:var(--gold);font-weight:700">'+extraUnits+'</span> '+t('cover_extra_units');
 }
 </script>
 </body>
