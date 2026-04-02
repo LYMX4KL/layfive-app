@@ -2,394 +2,712 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="LayFive">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#1a1a2e">
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon.png">
+<link rel="apple-touch-icon" href="LayFive Logo.png">
 <title>LayFive</title>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
 <style>
 :root{--m:#999;--w:#2a8a2a;--wa:#1a70c4;--f:#d03000;--e:#c49000;--bg:#1a1a2e;--card:#16213e;--acc:#0f3460;--txt:#e4e4e4;--gold:#ffd700;--dim:#888}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--txt);overflow-x:hidden;font-size:14px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--txt);font-size:16px}
 button{font-family:inherit}
 
-/* === AUTH OVERLAY === */
-.auth-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}
-.auth-overlay.hidden{display:none}
-.auth-box{background:var(--card);border-radius:12px;padding:24px;width:100%;max-width:340px;border:1px solid #333}
-.auth-box h2{color:var(--gold);text-align:center;margin-bottom:16px;font-size:1.3em}
-.auth-box input{width:100%;padding:10px 12px;border-radius:6px;border:1px solid #444;background:#222;color:#fff;font-size:.95em;margin-bottom:10px}
-.auth-box .btn-auth{width:100%;padding:10px;border:none;border-radius:6px;font-weight:700;font-size:.95em;cursor:pointer;margin-bottom:8px}
-.btn-login{background:var(--gold);color:#000}
-.btn-signup{background:#555;color:#fff}
-.btn-guest{background:transparent;border:1px solid #555!important;color:var(--dim)}
-.auth-err{color:#e74c3c;font-size:.8em;text-align:center;min-height:20px;margin-bottom:6px}
-.auth-toggle{color:var(--gold);text-align:center;font-size:.85em;cursor:pointer;margin-top:8px}
-.auth-user{font-size:.7em;color:var(--dim);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* === SCREENS === */
+.screen{display:none;min-height:100vh}
+.screen.active{display:block}
+
+/* === SETUP WIZARD === */
+.setup-wrap{padding:20px;max-width:500px;margin:0 auto}
+.setup-wrap h1{color:var(--gold);text-align:center;margin-bottom:10px}
+.setup-wrap h2{color:var(--gold);font-size:1.1em;margin:15px 0 8px}
+.setup-wrap p,.setup-wrap li{font-size:.9em;line-height:1.6;color:var(--txt)}
+.setup-wrap ol{padding-left:20px;margin:8px 0}
+.setup-wrap textarea{width:100%;height:120px;background:#222;color:#0f0;border:1px solid #444;border-radius:6px;padding:10px;font-family:monospace;font-size:.8em;margin:8px 0}
+.setup-wrap .btn-primary{display:block;width:100%;padding:12px;background:var(--gold);color:#000;font-weight:700;font-size:1em;border:none;border-radius:8px;cursor:pointer;margin-top:10px}
+.setup-wrap .btn-skip{display:block;width:100%;padding:10px;background:#333;color:var(--txt);font-weight:600;font-size:.9em;border:1px solid #555;border-radius:8px;cursor:pointer;margin-top:8px}
+
+/* === AUTH SCREEN === */
+.auth-wrap{padding:20px;max-width:400px;margin:0 auto;text-align:center}
+.auth-wrap .logo-big{font-size:2em;color:var(--gold);font-weight:900;margin:30px 0 5px}
+.auth-wrap .sub{color:var(--dim);font-size:.85em;margin-bottom:25px}
+.auth-form{text-align:left}
+.auth-form label{font-size:.85em;color:var(--dim);display:block;margin:10px 0 4px}
+.auth-form input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #444;background:#222;color:#fff;font-size:1em}
+.auth-form .btn-primary{display:block;width:100%;padding:12px;background:var(--gold);color:#000;font-weight:700;font-size:1em;border:none;border-radius:8px;cursor:pointer;margin-top:15px}
+.auth-form .btn-link{background:none;border:none;color:var(--gold);font-size:.85em;cursor:pointer;padding:5px;margin-top:8px}
+.auth-error{color:#e74c3c;font-size:.85em;margin-top:8px;min-height:20px}
 
 /* === TOP BAR === */
-.top{background:#111;padding:4px 6px;display:flex;align-items:center;gap:4px;position:sticky;top:0;z-index:100;border-bottom:1px solid #333;flex-wrap:wrap}
-.top .logo{color:var(--gold);font-weight:800;font-size:1em}
-.top input{padding:2px 4px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:.75em;width:80px}
-.top select{padding:2px 3px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:.75em}
-.top .btn-sm{padding:2px 6px;border:none;border-radius:4px;font-size:.7em;cursor:pointer;font-weight:600}
-.btn-logout{background:#555;color:#ccc}
+.top{background:#111;padding:8px 10px;display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:100;border-bottom:1px solid #333;flex-wrap:wrap}
+.top .logo{color:var(--gold);font-weight:800;font-size:1.2em}
+.top input[type="date"]{padding:4px 6px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:.85em;width:auto}
+.top input[type="text"]{padding:4px 6px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:.85em;width:70px}
+.top select{padding:4px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:.85em}
+.top .spacer{flex:1}
+.lang-btn{background:none;border:1px solid var(--gold);color:var(--gold);border-radius:4px;padding:3px 8px;font-size:.8em;cursor:pointer;font-weight:700}
+.profile-btn{background:none;border:none;color:var(--dim);font-size:1.2em;cursor:pointer;padding:3px 6px}
 
 /* === TABS === */
-.tabs{display:flex;background:#111;border-bottom:2px solid var(--gold);position:sticky;top:33px;z-index:99}
-.tab{flex:1;padding:6px 2px;text-align:center;font-size:.7em;font-weight:600;color:var(--dim);background:transparent;border:none;cursor:pointer}
+.tabs{display:flex;background:#111;border-bottom:2px solid var(--gold);position:sticky;top:45px;z-index:99}
+.tab{flex:1;padding:10px 4px;text-align:center;font-size:.85em;font-weight:600;color:var(--dim);background:transparent;border:none;cursor:pointer}
 .tab.on{color:var(--gold);border-bottom:2px solid var(--gold);margin-bottom:-2px}
 .pane{display:none}.pane.on{display:block}
 
-/* === NUMBER INPUT (compact) === */
-.nums{display:grid;grid-template-columns:repeat(10,1fr);gap:1px;padding:2px;background:#0a0a1a}
-.nb{height:26px;border:none;border-radius:3px;font-weight:700;font-size:.8em;cursor:pointer;color:#fff}
-.nb:active{opacity:.7}
-.nb.r{background:#b22222}.nb.b{background:#222}.nb.g{background:#1a7a3a}
-.actions{display:flex;gap:3px;padding:3px;background:#0a0a1a}
-.actions button{flex:1;padding:4px;border:none;border-radius:4px;font-weight:600;font-size:.7em;cursor:pointer}
+/* === NUMBER INPUT === */
+.nums{display:grid;grid-template-columns:repeat(10,1fr);gap:3px;padding:6px;background:#0a0a1a}
+.nb{height:38px;border:none;border-radius:6px;font-weight:700;font-size:1em;cursor:pointer;color:#fff}
+.nb:active{opacity:.7;transform:scale(.95)}
+.nb.r{background:#b22222}.nb.b{background:#333}.nb.g{background:#1a7a3a}
+.actions{display:flex;gap:4px;padding:4px 6px;background:#0a0a1a}
+.actions button{flex:1;padding:8px;border:none;border-radius:6px;font-weight:600;font-size:.85em;cursor:pointer}
 .btn-undo{background:#c44;color:#fff}.btn-new{background:#555;color:#fff}.btn-save{background:var(--gold);color:#000}
 
-/* === MAIN SPLIT LAYOUT === */
-.split{display:flex;gap:0;min-height:calc(100vh - 160px)}
-.split-left{width:140px;min-width:140px;overflow-y:auto;border-right:1px solid #333}
-.split-right{flex:1;overflow-y:auto;padding:4px;background:var(--bg)}
+/* === PAGE NAV === */
+.page-nav{display:flex;align-items:center;justify-content:center;gap:8px;padding:6px;background:#0a0a1a}
+.page-nav button{background:#333;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:.9em;cursor:pointer;font-weight:600}
+.page-nav button:disabled{opacity:.3}
+.page-nav .page-info{color:var(--gold);font-weight:700;font-size:.95em;min-width:80px;text-align:center}
 
-/* === SCORECARD TABLE (compact) === */
+/* === SCORECARD TABLE === */
+.sc-wrap{overflow-x:auto;overflow-y:auto;padding:4px}
 .sc{border-collapse:collapse;width:100%;table-layout:fixed}
-.sc th{padding:1px;font-size:.55em;font-weight:700;text-align:center;border:1px solid #ccc;background:#f0f0f0;color:#333}
-.sc td{padding:0;text-align:center;border:1px solid #ddd;height:18px;font-size:.7em;color:#222;background:#fff}
-.sc .rn{width:14px;background:#f5f5f5;color:#aaa;font-size:.55em}
-.sc .sn{width:20px;background:#ffe;font-weight:700;font-size:.7em}
-.sc .el{width:18px}
-.sc .rl td{border-bottom:2px solid #c00}
+.sc th{padding:4px 2px;font-size:.85em;font-weight:700;text-align:center;border:1px solid #ccc;background:#f0f0f0;color:#333}
+.sc td{padding:2px;text-align:center;border:1px solid #ddd;height:30px;font-size:1em;color:#222;background:#fff}
+.sc .rn{width:24px;background:#f5f5f5;color:#aaa;font-size:.75em}
+.sc .sn{width:32px;background:#ffe;font-weight:700;font-size:1em}
+.sc .el{width:32px}
+.sc .rl td{border-bottom:2.5px solid #c00}
 .sc .cM{background:#f0f0f0}.sc .cW{background:#eaf5ea}.sc .cWa{background:#e6f0fb}.sc .cF{background:#fce8e4}.sc .cE{background:#fdf6e0}
 .hM{background:#ddd!important;color:#555!important}.hW{background:#d5ecd5!important;color:#1a6a1a!important}
 .hWa{background:#d4e8f8!important;color:#1a60a0!important}.hF{background:#f5d5cc!important;color:#a02000!important}
 .hE{background:#f5ecc8!important;color:#8a6a00!important}
 .h-s{font-weight:700}.h-sp{font-weight:700}
-.circ{display:inline-flex;width:14px;height:14px;border-radius:50%;border:1.5px solid #c00;align-items:center;justify-content:center;font-size:.6em}
+.circ{display:inline-flex;width:22px;height:22px;border-radius:50%;border:2px solid #c00;align-items:center;justify-content:center;font-size:.85em}
 .sn-r{background:#f8d7da!important}.sn-b{background:#d6d6d6!important}.sn-g{background:#d4edda!important}
 
-/* === LIVE STATS PANEL === */
-.stats{font-size:.75em}
-.stats-header{background:var(--card);border-radius:6px;padding:6px;margin-bottom:4px;text-align:center;border:1px solid #333}
-.stats-header .big{font-size:1.8em;font-weight:800;color:var(--gold)}
-.stats-header .sub{color:var(--dim);font-size:.85em}
-
-.el-row{background:var(--card);border-radius:6px;padding:5px;margin-bottom:3px;border-left:3px solid;display:grid;grid-template-columns:28px 1fr;gap:4px;align-items:start}
-.el-row .el-sym{font-weight:800;font-size:1.1em;text-align:center}
-.el-row .el-data{font-size:.85em;line-height:1.4}
-.el-pct{font-weight:700;font-size:1em}
-.el-detail{color:var(--dim);font-size:.8em}
-.el-bar{height:4px;border-radius:2px;background:#333;margin:2px 0;position:relative;overflow:hidden}
-.el-bar-fill{height:100%;border-radius:2px;opacity:.8}
-.el-bar-exp{position:absolute;left:48.65%;top:0;height:100%;width:1px;background:var(--gold)}
-.el-signal{font-size:.75em;font-weight:600;padding:1px 4px;border-radius:3px;display:inline-block;margin-top:1px}
-.sig-hot{background:rgba(46,204,113,.15);color:#2ecc71}
-.sig-watch{background:rgba(241,196,15,.15);color:#f1c40f}
-.sig-cold{background:rgba(100,100,100,.15);color:#888}
-.sig-ahead{background:rgba(46,204,113,.15);color:#2ecc71}
-
-/* Catch-up section */
-.catchup{background:var(--card);border-radius:6px;padding:6px;margin-top:4px;border:1px solid #333}
-.catchup h4{color:var(--gold);font-size:.8em;margin-bottom:4px}
-.catchup-row{display:flex;justify-content:space-between;align-items:center;padding:2px 0;font-size:.8em}
-.catchup-row .el-s{font-weight:700;width:20px}
-.catchup-row .prob{font-weight:600}
+/* === MOST BEHIND PANEL === */
+.behind-banner{background:linear-gradient(135deg,#1a1a3e,#2a1a3e);border:2px solid #e74c3c;border-radius:10px;padding:12px;margin:6px;display:none}
+.behind-banner .label{font-size:.75em;color:var(--dim);text-transform:uppercase;letter-spacing:1px}
+.behind-banner .element-name{font-size:2em;font-weight:900;margin:4px 0}
+.behind-banner .stats{display:flex;gap:15px;margin-top:6px}
+.behind-banner .stat{font-size:.85em}
+.behind-banner .stat .val{font-weight:700;font-size:1.1em}
+.behind-banner .stat .lbl{color:var(--dim);font-size:.8em}
 
 /* === ANALYSIS PANEL === */
-.apanel{padding:6px;background:var(--bg)}
-.acard{background:var(--card);border-radius:8px;padding:8px;margin-bottom:6px;border:1px solid #333}
-.acard h3{color:var(--gold);font-size:.85em;margin-bottom:5px}
-.ebox{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:6px}
-.eb{padding:5px 2px;border-radius:5px;text-align:center;border:1px solid}
-.eb .val{font-size:1.3em;font-weight:800}.eb .lbl{font-size:.55em;color:var(--dim)}.eb .pct{font-size:.75em;margin-top:1px}
+.apanel{padding:8px;background:var(--bg)}
+.acard{background:var(--card);border-radius:10px;padding:10px;margin-bottom:8px;border:1px solid #333}
+.acard h3{color:var(--gold);font-size:.95em;margin-bottom:6px}
+.ebox{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-bottom:8px}
+.eb{padding:6px 3px;border-radius:6px;text-align:center;border:2px solid}
+.eb .val{font-size:1.5em;font-weight:800}.eb .lbl{font-size:.65em;color:var(--dim)}.eb .pct{font-size:.85em;margin-top:2px}
 .above{color:#2ecc71}.below{color:#e74c3c}.near{color:var(--gold)}
-.bar-row{display:flex;align-items:center;gap:4px;margin:3px 0}
-.bar-el{width:16px;font-size:.7em;font-weight:700}
-.bar-bg{flex:1;height:14px;background:#333;border-radius:7px;position:relative;overflow:hidden}
-.bar-fill{height:100%;border-radius:7px;opacity:.75;transition:width .4s}
-.bar-exp{position:absolute;left:48.65%;top:0;height:100%;width:1.5px;background:var(--gold)}
-.bar-val{font-size:.65em;width:65px;text-align:right}
-.behind-row{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:5px;background:rgba(255,255,255,.03);font-size:.8em;margin-bottom:2px}
-.behind-row .el-name{width:50px;font-weight:700}
-.behind-row .detail{flex:1;font-size:.85em}
+.bar-row{display:flex;align-items:center;gap:6px;margin:4px 0}
+.bar-el{width:20px;font-size:.8em;font-weight:700}
+.bar-bg{flex:1;height:18px;background:#333;border-radius:9px;position:relative;overflow:hidden}
+.bar-fill{height:100%;border-radius:9px;opacity:.75;transition:width .4s}
+.bar-exp{position:absolute;left:48.65%;top:0;height:100%;width:2px;background:var(--gold)}
+.bar-val{font-size:.75em;width:75px;text-align:right}
+.behind-grid{display:grid;grid-template-columns:1fr;gap:5px}
+.behind-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;background:rgba(255,255,255,.03);font-size:.85em;flex-wrap:wrap}
+.behind-row .el-name{width:55px;font-weight:700}
+.behind-row .detail{flex:1;font-size:.85em;min-width:120px}
 .signal-hot{color:#2ecc71;font-weight:700}.signal-watch{color:#f1c40f;font-weight:700}.signal-cold{color:#e74c3c;font-weight:700}
-.rec{padding:8px;border-radius:6px;text-align:center;font-weight:600;font-size:.85em;margin:6px 0}
+.rec{padding:10px;border-radius:8px;text-align:center;font-weight:600;font-size:.9em;margin:8px 0}
 .rec-go{background:rgba(46,204,113,.15);border:1px solid #2ecc71;color:#2ecc71}
 .rec-wait{background:rgba(241,196,15,.15);border:1px solid #f1c40f;color:#f1c40f}
 .rec-stop{background:rgba(231,76,60,.15);border:1px solid #e74c3c;color:#e74c3c}
 
+/* === SESSION END RECOMMENDATIONS === */
+.end-rec{background:var(--card);border-radius:10px;padding:12px;margin:8px 0;border:2px solid var(--gold)}
+.end-rec h3{color:var(--gold);margin-bottom:8px}
+.end-rec .verdict{font-size:1.3em;font-weight:800;text-align:center;padding:10px;border-radius:8px;margin-bottom:8px}
+.end-rec .reason{font-size:.85em;margin:4px 0;padding:4px 8px;border-radius:4px;background:rgba(255,255,255,.03)}
+
 /* === SESSIONS TAB === */
-.sess-table{width:100%;border-collapse:collapse;font-size:.7em;color:var(--txt)}
-.sess-table th{background:var(--acc);padding:4px;text-align:center}.sess-table td{padding:3px;text-align:center;border-bottom:1px solid #333}
+.sess-table{width:100%;border-collapse:collapse;font-size:.8em;color:var(--txt)}
+.sess-table th{background:var(--acc);padding:5px;text-align:center;font-size:.85em}
+.sess-table td{padding:4px;text-align:center;border-bottom:1px solid #333;font-size:.85em}
+
+/* === PROFILE === */
+.profile-wrap{padding:15px;max-width:400px;margin:0 auto}
+.profile-wrap h2{color:var(--gold);margin-bottom:15px}
+.profile-wrap label{font-size:.85em;color:var(--dim);display:block;margin:10px 0 4px}
+.profile-wrap input{width:100%;padding:10px;border-radius:8px;border:1px solid #444;background:#222;color:#fff;font-size:1em}
+.profile-wrap .btn-primary{display:block;width:100%;padding:12px;background:var(--gold);color:#000;font-weight:700;border:none;border-radius:8px;cursor:pointer;margin-top:12px}
+.profile-wrap .btn-danger{display:block;width:100%;padding:10px;background:#c44;color:#fff;font-weight:600;border:none;border-radius:8px;cursor:pointer;margin-top:10px}
+.profile-msg{font-size:.85em;margin-top:8px;min-height:20px}
 
 /* === RESPONSIVE === */
-@media(max-width:380px){.split-left{width:125px;min-width:125px}.sc .el{width:16px}.sc .sn{width:18px}.sc .rn{width:13px}.sc td{height:16px;font-size:.6em}.circ{width:12px;height:12px;font-size:.55em}}
-@media(min-width:700px){body{max-width:700px;margin:0 auto}.split-left{width:180px;min-width:180px}}
+@media(min-width:700px){body{max-width:700px;margin:0 auto}}
 </style>
 </head>
 <body>
 
-<!-- AUTH OVERLAY -->
-<div class="auth-overlay" id="authOverlay">
-  <div class="auth-box">
-    <h2 id="authTitle">Login to LayFive</h2>
-    <div class="auth-err" id="authErr"></div>
-    <input type="email" id="authEmail" placeholder="Email address">
-    <input type="password" id="authPwd" placeholder="Password">
-    <input type="text" id="authName" placeholder="Display name" style="display:none">
-    <button class="btn-auth btn-login" id="authBtn" onclick="doAuth()">Login</button>
-    <button class="btn-auth btn-guest" onclick="guestMode()">Continue as Guest</button>
-    <div class="auth-toggle" id="authToggle" onclick="toggleAuthMode()">Don't have an account? <strong>Sign Up</strong></div>
-  </div>
+<!-- ==================== SETUP WIZARD ==================== -->
+<div class="screen" id="screenSetup">
+<div class="setup-wrap">
+  <h1>🎰 LayFive</h1>
+  <p style="text-align:center;color:var(--dim)" data-i18n="setup_intro">First-time setup: Connect to Firebase for cloud storage & login.</p>
+
+  <h2 data-i18n="setup_step1">Step 1: Create a Firebase Project</h2>
+  <ol>
+    <li data-i18n="setup_s1a">Go to <a href="https://console.firebase.google.com" target="_blank" style="color:var(--gold)">console.firebase.google.com</a></li>
+    <li data-i18n="setup_s1b">Click "Add project" → name it "LayFive" → Continue</li>
+    <li data-i18n="setup_s1c">Turn off Google Analytics (optional) → Create Project</li>
+  </ol>
+
+  <h2 data-i18n="setup_step2">Step 2: Enable Email Login</h2>
+  <ol>
+    <li data-i18n="setup_s2a">In your project, go to Build → Authentication → Get Started</li>
+    <li data-i18n="setup_s2b">Click "Email/Password" → Enable → Save</li>
+  </ol>
+
+  <h2 data-i18n="setup_step3">Step 3: Create Database</h2>
+  <ol>
+    <li data-i18n="setup_s3a">Go to Build → Firestore Database → Create Database</li>
+    <li data-i18n="setup_s3b">Choose "Start in test mode" → pick a location → Enable</li>
+  </ol>
+
+  <h2 data-i18n="setup_step4">Step 4: Get Config</h2>
+  <ol>
+    <li data-i18n="setup_s4a">Go to Project Settings (⚙️ gear icon)</li>
+    <li data-i18n="setup_s4b">Under "Your apps" → click Web (&lt;/&gt;) → Register app</li>
+    <li data-i18n="setup_s4c">Copy the firebaseConfig object and paste below:</li>
+  </ol>
+
+  <textarea id="configInput" placeholder='{"apiKey":"...","authDomain":"...","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}'></textarea>
+  <button class="btn-primary" onclick="saveConfig()" data-i18n="setup_save">Save & Connect</button>
+  <button class="btn-skip" onclick="skipSetup()" data-i18n="setup_skip">Skip — Use Offline Mode (data saved on this device only)</button>
+  <p id="setupError" style="color:#e74c3c;font-size:.85em;margin-top:8px"></p>
+</div>
 </div>
 
+<!-- ==================== AUTH SCREEN ==================== -->
+<div class="screen" id="screenAuth">
+<div class="auth-wrap">
+  <div class="logo-big">LayFive</div>
+  <div class="sub" data-i18n="auth_sub">Cruise Roulette Tracker 邮轮轮盘追踪</div>
+
+  <!-- Login Form -->
+  <div id="authLogin" class="auth-form">
+    <label data-i18n="auth_email">Email</label>
+    <input type="email" id="loginEmail" autocomplete="email">
+    <label data-i18n="auth_pass">Password</label>
+    <input type="password" id="loginPass" autocomplete="current-password">
+    <button class="btn-primary" onclick="doLogin()" data-i18n="auth_login">Log In</button>
+    <div style="display:flex;justify-content:space-between;margin-top:8px">
+      <button class="btn-link" onclick="showAuthForm('signup')" data-i18n="auth_new">Create Account</button>
+      <button class="btn-link" onclick="showAuthForm('reset')" data-i18n="auth_forgot">Forgot Password?</button>
+    </div>
+    <div class="auth-error" id="loginError"></div>
+  </div>
+
+  <!-- Signup Form -->
+  <div id="authSignup" class="auth-form" style="display:none">
+    <label data-i18n="auth_name">Display Name</label>
+    <input type="text" id="signupName">
+    <label data-i18n="auth_email">Email</label>
+    <input type="email" id="signupEmail" autocomplete="email">
+    <label data-i18n="auth_pass">Password</label>
+    <input type="password" id="signupPass" autocomplete="new-password">
+    <label data-i18n="auth_pass_confirm">Confirm Password</label>
+    <input type="password" id="signupPass2" autocomplete="new-password">
+    <button class="btn-primary" onclick="doSignup()" data-i18n="auth_create">Create Account</button>
+    <button class="btn-link" onclick="showAuthForm('login')" data-i18n="auth_back_login">← Back to Login</button>
+    <div class="auth-error" id="signupError"></div>
+  </div>
+
+  <!-- Reset Form -->
+  <div id="authReset" class="auth-form" style="display:none">
+    <label data-i18n="auth_email">Email</label>
+    <input type="email" id="resetEmail">
+    <button class="btn-primary" onclick="doReset()" data-i18n="auth_send_reset">Send Reset Link</button>
+    <button class="btn-link" onclick="showAuthForm('login')" data-i18n="auth_back_login">← Back to Login</button>
+    <div class="auth-error" id="resetError"></div>
+  </div>
+
+  <div style="margin-top:20px">
+    <button class="btn-link" onclick="switchLangAuth()" id="authLangBtn">中文 / English</button>
+  </div>
+</div>
+</div>
+
+<!-- ==================== MAIN APP ==================== -->
+<div class="screen" id="screenApp">
+
 <!-- TOP BAR -->
-<div class="top" id="appBar" style="display:none">
+<div class="top">
   <span class="logo">LayFive</span>
   <input type="date" id="iDate">
-  <input type="text" id="iCasino" placeholder="Casino" style="width:50px">
-  <select id="iPage" onchange="goPage()"></select>
-  <span class="auth-user" id="userLabel"></span>
-  <button class="btn-sm btn-logout" onclick="doLogout()">Out</button>
+  <input type="text" id="iCasino" placeholder="Casino" data-i18n-ph="casino_ph">
+  <span class="spacer"></span>
+  <button class="lang-btn" onclick="toggleLang()" id="langBtn">中</button>
+  <button class="profile-btn" onclick="showTab(3)" title="Profile">👤</button>
 </div>
 
 <!-- TABS -->
-<div class="tabs" id="appTabs" style="display:none">
-  <button class="tab on" onclick="showTab(0)">Play</button>
-  <button class="tab" onclick="showTab(1)">Analysis</button>
-  <button class="tab" onclick="showTab(2)">Sessions</button>
-  <button class="tab" onclick="showTab(3)">Account</button>
+<div class="tabs">
+  <button class="tab on" onclick="showTab(0)" data-i18n="tab_score">Scorecard</button>
+  <button class="tab" onclick="showTab(1)" data-i18n="tab_analysis">Analysis</button>
+  <button class="tab" onclick="showTab(2)" data-i18n="tab_sessions">Sessions</button>
+  <button class="tab" onclick="showTab(3)" data-i18n="tab_profile">Profile</button>
 </div>
 
-<!-- ==================== PLAY TAB (Scorecard + Live Stats) ==================== -->
-<div class="pane on" id="p0" style="display:none">
+<!-- ==================== SCORECARD TAB ==================== -->
+<div class="pane on" id="p0">
   <div class="nums" id="numGrid"></div>
   <div class="actions">
-    <button class="btn-undo" onclick="undo()">Undo</button>
-    <button class="btn-new" onclick="newSess()">New</button>
-    <button class="btn-save" onclick="saveSess()">Save</button>
+    <button class="btn-undo" onclick="undo()" data-i18n="btn_undo">↩ Undo</button>
+    <button class="btn-new" onclick="newSess()" data-i18n="btn_new">New</button>
+    <button class="btn-save" onclick="saveSess()" data-i18n="btn_save">Save Session</button>
   </div>
-  <div class="split">
-    <div class="split-left">
-      <table class="sc"><thead><tr>
-        <th class="rn">#</th><th class="sn">D</th>
-        <th class="hM el">é</th><th class="hW el">æ¨</th><th class="hWa el">æ°´</th><th class="hF el">ç«</th><th class="hE el">å</th>
-      </tr></thead><tbody id="scBody"></tbody></table>
-    </div>
-    <div class="split-right">
-      <div class="stats" id="liveStats">
-        <div class="stats-header">
-          <div class="big" id="spinCount">0</div>
-          <div class="sub">spins</div>
-        </div>
-        <div id="elRows"></div>
-        <div class="catchup" id="catchupPanel">
-          <h4>Catch-Up Estimate</h4>
-          <div id="catchupRows"></div>
-        </div>
-      </div>
+  <!-- Page Navigation -->
+  <div class="page-nav">
+    <button onclick="prevPage()" id="btnPrev" disabled>◀</button>
+    <span class="page-info" id="pageInfo">Page 1</span>
+    <button onclick="nextPage()" id="btnNext" disabled>▶</button>
+  </div>
+  <!-- Scorecard -->
+  <div class="sc-wrap">
+    <table class="sc"><thead><tr>
+      <th class="rn">#</th><th class="sn">Drop</th>
+      <th class="hM el">金</th><th class="hW el">木</th><th class="hWa el">水</th><th class="hF el">火</th><th class="hE el">土</th>
+    </tr></thead><tbody id="scBody"></tbody></table>
+  </div>
+  <!-- Most Behind Element Banner -->
+  <div class="behind-banner" id="behindBanner">
+    <div class="label" data-i18n="most_behind">MOST BEHIND ELEMENT</div>
+    <div class="element-name" id="behindName">—</div>
+    <div class="stats">
+      <div class="stat"><span class="val" id="behindSt">—</span><br><span class="lbl" data-i18n="straight">Straight</span></div>
+      <div class="stat"><span class="val" id="behindSp">—</span><br><span class="lbl" data-i18n="split">Split</span></div>
+      <div class="stat"><span class="val" id="behindTotal">—</span><br><span class="lbl" data-i18n="total">Total</span></div>
     </div>
   </div>
 </div>
 
 <!-- ==================== ANALYSIS TAB ==================== -->
-<div class="pane" id="p1" style="display:none">
+<div class="pane" id="p1">
   <div class="apanel">
     <div class="acard">
-      <h3>Element Hit Summary â <span id="aTotalSpins">0</span> spins</h3>
+      <h3 data-i18n="hit_summary">Element Hit Summary</h3>
+      <div style="font-size:.85em;color:var(--dim);margin-bottom:5px"><span id="aTotalSpins">0</span> <span data-i18n="spins">spins</span></div>
       <div class="ebox" id="aBoxes"></div>
       <div id="aBars"></div>
     </div>
     <div class="acard">
-      <h3>Behind-Element Analysis</h3>
-      <p style="font-size:.7em;color:var(--dim);margin-bottom:5px">When straight hits fall behind splits â straight numbers tend to catch up.</p>
+      <h3 data-i18n="behind_analysis">Behind-Element Analysis</h3>
+      <p style="font-size:.75em;color:var(--dim);margin-bottom:5px" data-i18n="behind_desc">Elements below expected %. Straight behind more than splits → catch-up likely.</p>
       <div id="aBehind"></div>
     </div>
     <div id="aRec" class="rec rec-go" style="display:none"></div>
     <div class="acard">
-      <h3>Straight vs Split Breakdown</h3>
+      <h3 data-i18n="svs_title">Straight vs Split Breakdown</h3>
       <div id="aSvS"></div>
     </div>
     <div class="acard">
-      <h3>Spins to Converge (within 5% of expected)</h3>
+      <h3 data-i18n="conv_title">Spins to Converge (within 5% of expected)</h3>
       <div id="aConv"></div>
+    </div>
+    <!-- Session End Recommendation -->
+    <div class="end-rec" id="endRec" style="display:none">
+      <h3 data-i18n="end_rec_title">Session Recommendation</h3>
+      <div class="verdict" id="endVerdict"></div>
+      <div id="endReasons"></div>
     </div>
   </div>
 </div>
 
 <!-- ==================== SESSIONS TAB ==================== -->
-<div class="pane" id="p2" style="display:none">
+<div class="pane" id="p2">
   <div class="apanel">
     <div class="acard">
-      <h3>Saved Sessions</h3>
+      <h3 data-i18n="saved_sessions">Saved Sessions</h3>
       <div id="sessList"></div>
     </div>
     <div class="acard">
-      <h3>Optimal Spin Analysis (All Sessions)</h3>
-      <p style="font-size:.7em;color:var(--dim);margin-bottom:5px">At which spin count did all elements come closest to expected 48.65%?</p>
+      <h3 data-i18n="optimal_title">Optimal Spin Analysis (Per Session)</h3>
+      <p style="font-size:.75em;color:var(--dim);margin-bottom:5px" data-i18n="optimal_desc">Across all sessions: at which spin count do elements converge closest to expected?</p>
       <div id="sessOptimal"></div>
     </div>
-  </div>
-</div>
-
-<!-- ==================== ACCOUNT TAB ==================== -->
-<div class="pane" id="p3" style="display:none">
-  <div class="apanel">
     <div class="acard">
-      <h3>Your Account</h3>
-      <div id="acctInfo"></div>
-    </div>
-    <div class="acard">
-      <h3>Community Stats</h3>
-      <p style="font-size:.8em;color:var(--dim);margin-bottom:5px">Aggregated data from all LayFive players</p>
-      <div id="communityStats">
-        <p style="color:var(--dim);font-size:.8em">Login to see community data</p>
-      </div>
-    </div>
-    <div class="acard">
-      <h3>Add to Home Screen</h3>
-      <p style="font-size:.8em;line-height:1.5;">
-        <strong>iPhone:</strong> Tap Share (ââ) â "Add to Home Screen"<br>
-        <strong>Android:</strong> Tap â® â "Add to Home Screen"
+      <h3 data-i18n="add_home">Add to Home Screen</h3>
+      <p style="font-size:.85em;line-height:1.6" data-i18n="add_home_desc">
+        <strong>iPhone:</strong> Tap Share (□↑) → "Add to Home Screen"<br>
+        <strong>Android:</strong> Tap ⋮ → "Add to Home Screen"
       </p>
     </div>
   </div>
 </div>
 
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<!-- ==================== PROFILE TAB ==================== -->
+<div class="pane" id="p3">
+  <div class="profile-wrap">
+    <h2 data-i18n="profile_title">Player Profile</h2>
+    <label data-i18n="auth_name">Display Name</label>
+    <input type="text" id="profName">
+    <label data-i18n="auth_email">Email</label>
+    <input type="email" id="profEmail" disabled style="opacity:.6">
+    <button class="btn-primary" onclick="updateProfile()" data-i18n="profile_update">Update Profile</button>
+
+    <h2 style="margin-top:25px" data-i18n="change_pass">Change Password</h2>
+    <label data-i18n="new_pass">New Password</label>
+    <input type="password" id="profNewPass">
+    <label data-i18n="confirm_pass">Confirm New Password</label>
+    <input type="password" id="profNewPass2">
+    <button class="btn-primary" onclick="changePassword()" data-i18n="btn_change_pass">Update Password</button>
+
+    <div class="profile-msg" id="profMsg"></div>
+
+    <button class="btn-danger" onclick="doLogout()" data-i18n="btn_logout">Log Out</button>
+
+    <div style="margin-top:15px;text-align:center">
+      <button class="btn-link" onclick="resetConfig()" data-i18n="btn_reset_config">Reset Firebase Config</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- end screenApp -->
 
 <script>
-// ===== FIREBASE CONFIG (to be filled in after project creation) =====
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyB5hGf2p9COuUflhcfkJ_jp_cl-jCdMWmY",
-  authDomain: "layfive-app.firebaseapp.com",
-  projectId: "layfive-app",
-  storageBucket: "layfive-app.firebasestorage.app",
-  messagingSenderId: "417066746184",
-  appId: "1:417066746184:web:d2223e6a5e4300e9f5f37d"
+// ===== i18n =====
+let lang = (navigator.language||'en').startsWith('zh') ? 'zh' : 'en';
+
+const T = {
+  // Setup
+  setup_intro: {en:'First-time setup: Connect to Firebase for cloud storage & login.', zh:'首次设置：连接 Firebase 以启用云存储和登录。'},
+  setup_step1: {en:'Step 1: Create a Firebase Project', zh:'第1步：创建 Firebase 项目'},
+  setup_s1a: {en:'Go to console.firebase.google.com', zh:'访问 console.firebase.google.com'},
+  setup_s1b: {en:'Click "Add project" → name it "LayFive" → Continue', zh:'点击"添加项目" → 命名为"LayFive" → 继续'},
+  setup_s1c: {en:'Turn off Google Analytics (optional) → Create Project', zh:'关闭 Google Analytics（可选）→ 创建项目'},
+  setup_step2: {en:'Step 2: Enable Email Login', zh:'第2步：启用邮箱登录'},
+  setup_s2a: {en:'Go to Build → Authentication → Get Started', zh:'前往 Build → Authentication → 开始'},
+  setup_s2b: {en:'Click "Email/Password" → Enable → Save', zh:'点击"Email/Password" → 启用 → 保存'},
+  setup_step3: {en:'Step 3: Create Database', zh:'第3步：创建数据库'},
+  setup_s3a: {en:'Go to Build → Firestore Database → Create Database', zh:'前往 Build → Firestore Database → 创建数据库'},
+  setup_s3b: {en:'Choose "Start in test mode" → pick location → Enable', zh:'选择"测试模式" → 选择位置 → 启用'},
+  setup_step4: {en:'Step 4: Get Config', zh:'第4步：获取配置'},
+  setup_s4a: {en:'Go to Project Settings (⚙️ gear icon)', zh:'前往项目设置（⚙️齿轮图标）'},
+  setup_s4b: {en:'Under "Your apps" → click Web (</>) → Register app', zh:'"您的应用"下 → 点击 Web (</>) → 注册应用'},
+  setup_s4c: {en:'Copy the firebaseConfig object and paste below:', zh:'复制 firebaseConfig 对象并粘贴到下方：'},
+  setup_save: {en:'Save & Connect', zh:'保存并连接'},
+  setup_skip: {en:'Skip — Use Offline Mode (data saved on this device only)', zh:'跳过 — 使用离线模式（数据仅保存在此设备）'},
+
+  // Auth
+  auth_sub: {en:'Cruise Roulette Tracker', zh:'邮轮轮盘追踪器'},
+  auth_email: {en:'Email', zh:'邮箱'},
+  auth_pass: {en:'Password', zh:'密码'},
+  auth_pass_confirm: {en:'Confirm Password', zh:'确认密码'},
+  auth_name: {en:'Display Name', zh:'显示名称'},
+  auth_login: {en:'Log In', zh:'登录'},
+  auth_create: {en:'Create Account', zh:'创建账户'},
+  auth_new: {en:'Create Account', zh:'创建账户'},
+  auth_forgot: {en:'Forgot Password?', zh:'忘记密码？'},
+  auth_send_reset: {en:'Send Reset Link', zh:'发送重置链接'},
+  auth_back_login: {en:'← Back to Login', zh:'← 返回登录'},
+
+  // Tabs
+  tab_score: {en:'Scorecard', zh:'记分卡'},
+  tab_analysis: {en:'Analysis', zh:'分析'},
+  tab_sessions: {en:'Sessions', zh:'场次'},
+  tab_profile: {en:'Profile', zh:'个人资料'},
+
+  // Scorecard
+  casino_ph: {en:'Casino', zh:'赌场'},
+  btn_undo: {en:'↩ Undo', zh:'↩ 撤销'},
+  btn_new: {en:'New', zh:'新场'},
+  btn_save: {en:'Save Session', zh:'保存场次'},
+  most_behind: {en:'MOST BEHIND ELEMENT', zh:'最落后元素'},
+  straight: {en:'Straight', zh:'直注'},
+  split: {en:'Split', zh:'分注'},
+  total: {en:'Total', zh:'总计'},
+
+  // Analysis
+  hit_summary: {en:'Element Hit Summary', zh:'元素命中汇总'},
+  spins: {en:'spins', zh:'次旋转'},
+  behind_analysis: {en:'Behind-Element Analysis', zh:'落后元素分析'},
+  behind_desc: {en:'Elements below expected %. Straight behind more than splits → catch-up likely.', zh:'低于预期%的元素。直注落后多于分注 → 可能追赶。'},
+  svs_title: {en:'Straight vs Split Breakdown', zh:'直注与分注详情'},
+  conv_title: {en:'Spins to Converge (within 5%)', zh:'收敛所需旋转数（5%以内）'},
+  end_rec_title: {en:'Session Recommendation', zh:'场次建议'},
+
+  // Sessions
+  saved_sessions: {en:'Saved Sessions', zh:'已保存场次'},
+  optimal_title: {en:'Optimal Spin Analysis (Per Session)', zh:'最佳旋转分析（按场次）'},
+  optimal_desc: {en:'Across sessions: at which spin count do elements converge closest?', zh:'跨场次：在哪个旋转数元素最接近预期？'},
+  add_home: {en:'Add to Home Screen', zh:'添加到主屏幕'},
+  add_home_desc: {en:'<strong>iPhone:</strong> Tap Share (□↑) → "Add to Home Screen"<br><strong>Android:</strong> Tap ⋮ → "Add to Home Screen"', zh:'<strong>iPhone:</strong> 点击分享 (□↑) → "添加到主屏幕"<br><strong>Android:</strong> 点击 ⋮ → "添加到主屏幕"'},
+  no_sessions: {en:'No saved sessions.', zh:'没有已保存的场次。'},
+  need_more: {en:'Need more data (25+ spins in saved sessions).', zh:'需要更多数据（已保存场次中25+次旋转）。'},
+  min_spins_warn: {en:'Need at least 25 spins to save a session!', zh:'至少需要25次旋转才能保存场次！'},
+  session_saved: {en:'Session saved!', zh:'场次已保存！'},
+  confirm_new: {en:'Start new session? Unsaved data will be lost.', zh:'开始新场次？未保存的数据将丢失。'},
+  confirm_del: {en:'Delete this session?', zh:'删除此场次？'},
+  no_spins: {en:'No spins recorded!', zh:'没有记录旋转！'},
+
+  // Profile
+  profile_title: {en:'Player Profile', zh:'玩家资料'},
+  profile_update: {en:'Update Profile', zh:'更新资料'},
+  change_pass: {en:'Change Password', zh:'修改密码'},
+  new_pass: {en:'New Password', zh:'新密码'},
+  confirm_pass: {en:'Confirm New Password', zh:'确认新密码'},
+  btn_change_pass: {en:'Update Password', zh:'更新密码'},
+  btn_logout: {en:'Log Out', zh:'退出登录'},
+  btn_reset_config: {en:'Reset Firebase Config', zh:'重置 Firebase 配置'},
+  profile_updated: {en:'Profile updated!', zh:'资料已更新！'},
+  pass_mismatch: {en:'Passwords do not match', zh:'密码不匹配'},
+  pass_updated: {en:'Password updated!', zh:'密码已更新！'},
+
+  // Recommendations
+  rec_stop_title: {en:'STOP — Protect Your Profits', zh:'停止 — 保护利润'},
+  rec_cont_title: {en:'CONTINUE — Elements Catching Up', zh:'继续 — 元素正在追赶'},
+  rec_caution_title: {en:'CAUTION — Mixed Signals', zh:'谨慎 — 信号混合'},
+  rec_early_title: {en:'KEEP PLAYING — Still Early', zh:'继续 — 仍然较早'},
+  rec_you_up: {en:'You are UP. Consider stopping to lock in profits.', zh:'您目前盈利。考虑停止以锁定利润。'},
+  rec_you_down: {en:'You are DOWN. Set a strict stop-loss limit.', zh:'您目前亏损。请设定严格止损。'},
+  rec_element_due: {en:'may catch up — straight hits are behind', zh:'可能追赶 — 直注落后'},
+  rec_both_behind: {en:'is behind on both straight and split', zh:'直注和分注都落后'},
+  rec_on_track: {en:'is on track or ahead', zh:'正常或领先'},
 };
 
-let fb=null, auth=null, db=null, currentUser=null;
-function initFirebase(){
-  if(!FIREBASE_CONFIG.apiKey) return false;
+function t(key){ return (T[key]&&T[key][lang]) || key; }
+
+function applyI18n(){
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const key=el.getAttribute('data-i18n');
+    if(T[key]) el.innerHTML=T[key][lang];
+  });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el=>{
+    const key=el.getAttribute('data-i18n-ph');
+    if(T[key]) el.placeholder=T[key][lang];
+  });
+  const lb=document.getElementById('langBtn');
+  if(lb) lb.textContent=lang==='en'?'中':'EN';
+}
+
+function toggleLang(){ lang=lang==='en'?'zh':'en'; localStorage.setItem('lf_lang',lang); applyI18n(); refreshAll(); }
+function switchLangAuth(){ toggleLang(); }
+
+// ===== FIREBASE CONFIG =====
+let firebaseReady = false;
+let offlineMode = false;
+let db = null;
+let auth = null;
+
+function getConfig(){ try{return JSON.parse(localStorage.getItem('lf_firebase_config'))}catch(e){return null} }
+
+function saveConfig(){
+  const raw=document.getElementById('configInput').value.trim();
   try{
-    fb=firebase.initializeApp(FIREBASE_CONFIG);
+    // Try to extract JSON config from pasted code
+    let cfg;
+    const match=raw.match(/\{[\s\S]*apiKey[\s\S]*\}/);
+    if(match) cfg=JSON.parse(match[0].replace(/'/g,'"').replace(/(\w+)\s*:/g,'"$1":'));
+    else cfg=JSON.parse(raw);
+    if(!cfg.apiKey||!cfg.projectId){throw new Error('Missing apiKey or projectId')}
+    localStorage.setItem('lf_firebase_config',JSON.stringify(cfg));
+    initFirebase(cfg);
+  }catch(e){
+    document.getElementById('setupError').textContent='Invalid config. Please paste the full firebaseConfig object. Error: '+e.message;
+  }
+}
+
+function skipSetup(){
+  offlineMode=true;
+  localStorage.setItem('lf_offline','1');
+  showScreen('screenApp');
+  initOffline();
+}
+
+function resetConfig(){
+  if(!confirm('Reset Firebase config? You will need to set up again.')){return}
+  localStorage.removeItem('lf_firebase_config');
+  localStorage.removeItem('lf_offline');
+  location.reload();
+}
+
+function initFirebase(cfg){
+  try{
+    firebase.initializeApp(cfg);
     auth=firebase.auth();
     db=firebase.firestore();
+    firebaseReady=true;
     auth.onAuthStateChanged(user=>{
-      currentUser=user;
-      if(user) showApp(user);
+      if(user){
+        currentUser=user;
+        showScreen('screenApp');
+        loadSessions();
+        fillProfile();
+      }else{
+        showScreen('screenAuth');
+      }
     });
-    return true;
-  }catch(e){console.log('Firebase init error:',e);return false}
+  }catch(e){
+    document.getElementById('setupError').textContent='Firebase error: '+e.message;
+  }
 }
-const fbReady=initFirebase();
+
+function initOffline(){
+  try{sessions=JSON.parse(localStorage.getItem('lf_sess')||'[]')}catch(e){sessions=[]}
+  refreshSessions();
+}
 
 // ===== AUTH =====
-let isSignup=false;
-function toggleAuthMode(){
-  isSignup=!isSignup;
-  document.getElementById('authTitle').textContent=isSignup?'Sign Up for LayFive':'Login to LayFive';
-  document.getElementById('authBtn').textContent=isSignup?'Create Account':'Login';
-  document.getElementById('authName').style.display=isSignup?'block':'none';
-  document.getElementById('authToggle').innerHTML=isSignup?
-    'Already have an account? <strong>Login</strong>':
-    'Don\'t have an account? <strong>Sign Up</strong>';
-  document.getElementById('authErr').textContent='';
+let currentUser=null;
+
+function showAuthForm(form){
+  ['authLogin','authSignup','authReset'].forEach(id=>document.getElementById(id).style.display='none');
+  document.getElementById('auth'+form.charAt(0).toUpperCase()+form.slice(1)).style.display='block';
 }
 
-function doAuth(){
-  if(!fbReady){
-    document.getElementById('authErr').textContent='Firebase not configured yet. Use Guest mode.';
-    return;
+async function doLogin(){
+  const email=document.getElementById('loginEmail').value;
+  const pass=document.getElementById('loginPass').value;
+  try{
+    await auth.signInWithEmailAndPassword(email,pass);
+  }catch(e){document.getElementById('loginError').textContent=e.message}
+}
+
+async function doSignup(){
+  const name=document.getElementById('signupName').value;
+  const email=document.getElementById('signupEmail').value;
+  const pass=document.getElementById('signupPass').value;
+  const pass2=document.getElementById('signupPass2').value;
+  if(pass!==pass2){document.getElementById('signupError').textContent=t('pass_mismatch');return}
+  try{
+    const cred=await auth.createUserWithEmailAndPassword(email,pass);
+    await cred.user.updateProfile({displayName:name});
+    currentUser=cred.user;
+  }catch(e){document.getElementById('signupError').textContent=e.message}
+}
+
+async function doReset(){
+  const email=document.getElementById('resetEmail').value;
+  try{
+    await auth.sendPasswordResetEmail(email);
+    document.getElementById('resetError').style.color='#2ecc71';
+    document.getElementById('resetError').textContent=lang==='zh'?'重置链接已发送！检查您的邮箱。':'Reset link sent! Check your email.';
+  }catch(e){document.getElementById('resetError').textContent=e.message}
+}
+
+async function doLogout(){
+  if(firebaseReady) await auth.signOut();
+  showScreen('screenAuth');
+}
+
+function fillProfile(){
+  if(!currentUser)return;
+  document.getElementById('profName').value=currentUser.displayName||'';
+  document.getElementById('profEmail').value=currentUser.email||'';
+}
+
+async function updateProfile(){
+  const name=document.getElementById('profName').value;
+  try{
+    await currentUser.updateProfile({displayName:name});
+    document.getElementById('profMsg').style.color='#2ecc71';
+    document.getElementById('profMsg').textContent=t('profile_updated');
+  }catch(e){
+    document.getElementById('profMsg').style.color='#e74c3c';
+    document.getElementById('profMsg').textContent=e.message;
   }
-  const email=document.getElementById('authEmail').value.trim();
-  const pwd=document.getElementById('authPwd').value;
-  const name=document.getElementById('authName').value.trim();
-  if(!email||!pwd){document.getElementById('authErr').textContent='Please enter email and password';return}
+}
 
-  document.getElementById('authErr').textContent='';
-  document.getElementById('authBtn').disabled=true;
-
-  if(isSignup){
-    auth.createUserWithEmailAndPassword(email,pwd).then(cred=>{
-      if(name) cred.user.updateProfile({displayName:name});
-      showApp(cred.user);
-    }).catch(e=>{
-      document.getElementById('authErr').textContent=e.message;
-      document.getElementById('authBtn').disabled=false;
-    });
-  }else{
-    auth.signInWithEmailAndPassword(email,pwd).then(cred=>{
-      showApp(cred.user);
-    }).catch(e=>{
-      document.getElementById('authErr').textContent=e.message;
-      document.getElementById('authBtn').disabled=false;
-    });
+async function changePassword(){
+  const p1=document.getElementById('profNewPass').value;
+  const p2=document.getElementById('profNewPass2').value;
+  if(p1!==p2){document.getElementById('profMsg').style.color='#e74c3c';document.getElementById('profMsg').textContent=t('pass_mismatch');return}
+  try{
+    await currentUser.updatePassword(p1);
+    document.getElementById('profMsg').style.color='#2ecc71';
+    document.getElementById('profMsg').textContent=t('pass_updated');
+    document.getElementById('profNewPass').value='';
+    document.getElementById('profNewPass2').value='';
+  }catch(e){
+    document.getElementById('profMsg').style.color='#e74c3c';
+    document.getElementById('profMsg').textContent=e.message;
   }
 }
 
-function guestMode(){
-  currentUser=null;
-  showApp(null);
+// ===== SCREEN NAV =====
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
 }
 
-function doLogout(){
-  if(auth&&currentUser) auth.signOut();
-  currentUser=null;
-  document.getElementById('authOverlay').classList.remove('hidden');
-  ['appBar','appTabs','p0','p1','p2','p3'].forEach(id=>document.getElementById(id).style.display='none');
-}
-
-function showApp(user){
-  document.getElementById('authOverlay').classList.add('hidden');
-  ['appBar','appTabs','p0'].forEach(id=>document.getElementById(id).style.display='');
-  document.getElementById('userLabel').textContent=user?(user.displayName||user.email.split('@')[0]):'Guest';
-  if(user) loadUserSessions();
-  refreshAcctTab();
-}
-
-// ===== LAYOUT DATA =====
+// ===== CORRECT LAYOUT DATA =====
 const L={
-  M:{n:'Metal é',s:'é',c:'var(--m)',
+  M:{n:'Metal 金',s:'金',c:'var(--m)',cn:'金 Metal',
     st:[1,2,9,10,14,18,20,24,27,28,31,32],sp:[[5,6],[19,22],[35,36]]},
-  W:{n:'Wood æ¨',s:'æ¨',c:'var(--w)',
+  W:{n:'Wood 木',s:'木',c:'var(--w)',cn:'木 Wood',
     st:[3,4,10,12,14,20,23,24,25,27,28,35],sp:[[8,9],[13,16],[32,33]]},
-  Wa:{n:'Water æ°´',s:'æ°´',c:'var(--wa)',
+  Wa:{n:'Water 水',s:'水',c:'var(--wa)',cn:'水 Water',
     st:[3,4,9,11,14,16,20,24,26,30,31,34],sp:[[7,10],[15,18],[32,35]]},
-  F:{n:'Fire ç«',s:'ç«',c:'var(--f)',
+  F:{n:'Fire 火',s:'火',c:'var(--f)',cn:'火 Fire',
     st:[4,7,9,12,14,19,20,24,26,27,28,35],sp:[[1,2],[15,18],[31,32]]},
-  E:{n:'Earth å',s:'å',c:'var(--e)',
+  E:{n:'Earth 土',s:'土',c:'var(--e)',cn:'土 Earth',
     st:[4,5,9,11,15,17,19,23,27,28,33,34],sp:[[2,3],[13,16],[35,36]]}
 };
 const ELS=['M','W','Wa','F','E'];
 const RED=[1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];
 const RPP=40;
-const EXP_HIT=18/37, EXP_ST=12/37, EXP_SP=6/37;
 
 function hitType(num,el){
   if(L[el].st.includes(num))return 's';
   for(const[a,b]of L[el].sp)if(num===a||num===b)return 'sp';
-  return'-';
+  return '-';
 }
 
 // ===== STATE =====
-let spins=[], page=1, sessions=[];
-try{sessions=JSON.parse(localStorage.getItem('lf_sess')||'[]')}catch(e){sessions=[]}
+let spins=[];
+let page=1;
+let sessions=[];
 
 // ===== INIT =====
-document.getElementById('iDate').valueAsDate=new Date();
-buildNums();buildRows();refreshAll();
+(function init(){
+  const savedLang=localStorage.getItem('lf_lang');
+  if(savedLang)lang=savedLang;
+  else lang=(navigator.language||'en').startsWith('zh')?'zh':'en';
+
+  // Pre-configured Firebase for Kenny's layfive-app project
+  const BUILTIN_CONFIG = {
+    apiKey: "AIzaSyB5hGf2p9COuUflhcfkJ_jp_cl-jCdMWmY",
+    authDomain: "layfive-app.firebaseapp.com",
+    projectId: "layfive-app",
+    storageBucket: "layfive-app.firebasestorage.app",
+    messagingSenderId: "417066746184",
+    appId: "1:417066746184:web:d2223e6a5e4300e9f5f37d"
+  };
+
+  const cfg = getConfig() || BUILTIN_CONFIG;
+  const isOffline = localStorage.getItem('lf_offline')==='1';
+
+  if(isOffline){
+    offlineMode=true;
+    showScreen('screenApp');
+    initOffline();
+  }else{
+    initFirebase(cfg);
+  }
+
+  document.getElementById('iDate').valueAsDate=new Date();
+  buildNums();
+  buildRows();
+  applyI18n();
+  refreshAll();
+})();
 
 function buildNums(){
   const g=document.getElementById('numGrid');
@@ -402,7 +720,8 @@ function buildNums(){
 }
 
 function buildRows(){
-  const tb=document.getElementById('scBody');tb.innerHTML='';
+  const tb=document.getElementById('scBody');
+  tb.innerHTML='';
   for(let r=1;r<=RPP;r++){
     const tr=document.createElement('tr');
     if(r===20)tr.className='rl';
@@ -418,7 +737,7 @@ function addSpin(num){
   const hits={};
   ELS.forEach(el=>hits[el]=hitType(num,el));
   spins.push({num,hits});
-  if(spins.length>(page)*RPP)page++;
+  if(spins.length>page*RPP)page++;
   refreshAll();
   const row=((spins.length-1)%RPP)+1;
   const cell=document.getElementById('s'+row);
@@ -426,61 +745,74 @@ function addSpin(num){
 }
 
 function undo(){if(spins.length){spins.pop();if(spins.length<=(page-1)*RPP&&page>1)page--;refreshAll()}}
-function newSess(){if(spins.length&&!confirm('Start new? Unsaved data will be lost.'))return;spins=[];page=1;refreshAll()}
 
-function saveSess(){
-  if(!spins.length){alert('No spins!');return}
-  const sess={date:document.getElementById('iDate').value||'Unknown',
+function newSess(){
+  if(spins.length&&!confirm(t('confirm_new')))return;
+  spins=[];page=1;refreshAll();
+}
+
+async function saveSess(){
+  if(!spins.length){alert(t('no_spins'));return}
+  if(spins.length<25){alert(t('min_spins_warn')+ ' ('+spins.length+'/25)');return}
+
+  const sess={
+    date:document.getElementById('iDate').value||new Date().toISOString().slice(0,10),
     casino:document.getElementById('iCasino').value||'-',
-    total:spins.length, spins:JSON.parse(JSON.stringify(spins)),
-    elements:{}, ts:Date.now()};
+    total:spins.length,
+    spins:JSON.parse(JSON.stringify(spins)),
+    elements:{},
+    ts:Date.now()
+  };
   ELS.forEach(el=>{
     const s=spins.filter(x=>x.hits[el]==='s').length;
     const sp=spins.filter(x=>x.hits[el]==='sp').length;
     sess.elements[el]={s,sp,t:s+sp};
   });
-  sessions.push(sess);
-  try{localStorage.setItem('lf_sess',JSON.stringify(sessions))}catch(e){}
-  // Save to Firebase if logged in
-  if(currentUser&&db){
-    db.collection('sessions').add({
-      uid:currentUser.uid,
-      ...sess,
-      spins:sess.spins // store full spin data for community analysis
-    }).then(()=>alert('Saved to cloud! ('+spins.length+' spins)'))
-    .catch(e=>alert('Saved locally. Cloud error: '+e.message));
+
+  if(firebaseReady && currentUser){
+    try{
+      await db.collection('users').doc(currentUser.uid).collection('sessions').add(sess);
+      await loadSessions();
+      alert(t('session_saved')+' ('+spins.length+' '+t('spins')+')');
+    }catch(e){alert('Save error: '+e.message)}
   }else{
-    alert('Saved locally! ('+spins.length+' spins)');
+    sessions.push(sess);
+    try{localStorage.setItem('lf_sess',JSON.stringify(sessions))}catch(e){}
+    alert(t('session_saved')+' ('+spins.length+' '+t('spins')+')');
   }
 }
 
-function goPage(){page=parseInt(document.getElementById('iPage').value)||1;refreshScorecard()}
+async function loadSessions(){
+  if(!firebaseReady||!currentUser)return;
+  try{
+    const snap=await db.collection('users').doc(currentUser.uid).collection('sessions').orderBy('ts','desc').get();
+    sessions=[];
+    snap.forEach(doc=>{const d=doc.data();d._id=doc.id;sessions.push(d)});
+    refreshSessions();
+  }catch(e){console.error('Load sessions error',e)}
+}
+
+// ===== PAGE NAV =====
+function prevPage(){if(page>1){page--;refreshScorecard()}}
+function nextPage(){const tp=Math.max(1,Math.ceil(spins.length/RPP));if(page<tp){page++;refreshScorecard()}}
 
 function showTab(i){
   document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('on',j===i));
-  ['p0','p1','p2','p3'].forEach((id,j)=>{
-    const el=document.getElementById(id);
-    el.classList.toggle('on',j===i);
-    el.style.display=j===i?'':'none';
-  });
+  document.querySelectorAll('.pane').forEach((p,j)=>p.classList.toggle('on',j===i));
   if(i===1)refreshAnalysis();
   if(i===2)refreshSessions();
-  if(i===3)refreshAcctTab();
 }
 
 // ===== REFRESH ALL =====
-function refreshAll(){refreshPageSelect();refreshScorecard();refreshLiveStats();refreshAnalysis()}
+function refreshAll(){refreshScorecard();refreshAnalysis();refreshBehindBanner()}
 
-function refreshPageSelect(){
-  const sel=document.getElementById('iPage');
-  const tp=Math.max(1,Math.ceil(spins.length/RPP));
-  sel.innerHTML='';
-  for(let i=1;i<=Math.max(tp,page);i++)
-    sel.innerHTML+=`<option value="${i}"${i===page?' selected':''}>P${i}</option>`;
-}
-
-// ===== SCORECARD =====
 function refreshScorecard(){
+  const tp=Math.max(1,Math.ceil(spins.length/RPP));
+  document.getElementById('btnPrev').disabled=page<=1;
+  document.getElementById('btnNext').disabled=page>=tp;
+  const pageLbl=lang==='zh'?'第 '+page+' 页 / '+tp:'Page '+page+' / '+tp;
+  document.getElementById('pageInfo').textContent=pageLbl+' ('+spins.length+' '+t('spins')+')';
+
   const off=(page-1)*RPP;
   const pageSpins=spins.slice(off,off+RPP);
   const cnt={},cntS={},cntSp={};
@@ -502,7 +834,8 @@ function refreshScorecard(){
     sCell.textContent=sp.num;
     sCell.className='sn '+(sp.num===0?'sn-g':RED.includes(sp.num)?'sn-r':'sn-b');
     ELS.forEach(el=>{
-      const c=document.getElementById('c'+r+el);c.className='el c'+el;
+      const c=document.getElementById('c'+r+el);
+      c.className='el c'+el;
       const type=sp.hits[el];
       if(type==='s'){cnt[el]++;cntS[el]++;c.innerHTML=`<span class="h-s">${cnt[el]}</span>`}
       else if(type==='sp'){cnt[el]++;cntSp[el]++;c.innerHTML=`<span class="h-sp"><span class="circ">${cnt[el]}</span></span>`}
@@ -511,98 +844,38 @@ function refreshScorecard(){
   }
 }
 
-// ===== LIVE STATS PANEL =====
-function refreshLiveStats(){
+// ===== MOST BEHIND BANNER =====
+function refreshBehindBanner(){
+  const banner=document.getElementById('behindBanner');
+  if(spins.length<5){banner.style.display='none';return}
+
   const n=spins.length;
-  document.getElementById('spinCount').textContent=n;
+  const expSt=12/37, expSp=6/37;
+  let worstEl=null,worstGap=-999;
 
-  if(!n){
-    document.getElementById('elRows').innerHTML='<div style="color:var(--dim);font-size:.8em;text-align:center;padding:10px">Tap a number to start recording</div>';
-    document.getElementById('catchupRows').innerHTML='<div style="color:var(--dim);font-size:.8em">Need spin data</div>';
-    return;
-  }
-
-  // Calculate stats
-  const d={};
   ELS.forEach(el=>{
-    const s=spins.filter(x=>x.hits[el]==='s').length;
-    const sp=spins.filter(x=>x.hits[el]==='sp').length;
-    d[el]={s,sp,t:s+sp};
+    const sHits=spins.filter(x=>x.hits[el]==='s').length;
+    const spHits=spins.filter(x=>x.hits[el]==='sp').length;
+    const stGap=expSt-(sHits/n);
+    const spGap=expSp-(spHits/n);
+    const totalGap=stGap+spGap; // positive = behind
+    if(totalGap>worstGap){worstGap=totalGap;worstEl=el}
   });
 
-  // Element rows
-  let html='';
-  ELS.forEach(el=>{
-    const pct=(d[el].t/n*100);
-    const stPct=(d[el].s/n*100);
-    const spPct=(d[el].sp/n*100);
-    const expTotal=Math.round(n*EXP_HIT);
-    const expSt=Math.round(n*EXP_ST);
-    const expSp=Math.round(n*EXP_SP);
-    const gap=d[el].t-expTotal;
-    const behind=pct<(EXP_HIT*100);
-    const stBehind=stPct<(EXP_ST*100);
-    const spBehind=spPct<(EXP_SP*100);
+  if(!worstEl||worstGap<=0){banner.style.display='none';return}
 
-    // Signal
-    let sig='',sigCls='';
-    if(behind && stBehind && !spBehind){
-      sig='ST DUE';sigCls='sig-hot';
-    }else if(behind && stBehind && spBehind && (EXP_ST*100-stPct)>(EXP_SP*100-spPct)){
-      sig='ST MORE DUE';sigCls='sig-hot';
-    }else if(behind && stBehind && spBehind){
-      sig='BEHIND';sigCls='sig-watch';
-    }else if(behind){
-      sig='SP BEHIND';sigCls='sig-watch';
-    }else if(pct>53){
-      sig='HOT';sigCls='sig-ahead';
-    }else{
-      sig='ON TRACK';sigCls='sig-cold';
-    }
+  const sHits=spins.filter(x=>x.hits[worstEl]==='s').length;
+  const spHits=spins.filter(x=>x.hits[worstEl]==='sp').length;
+  const stPct=(sHits/n*100).toFixed(1);
+  const spPct=(spHits/n*100).toFixed(1);
+  const totalPct=((sHits+spHits)/n*100).toFixed(1);
 
-    html+=`<div class="el-row" style="border-color:${L[el].c}">
-      <div class="el-sym" style="color:${L[el].c}">${L[el].s}</div>
-      <div class="el-data">
-        <span class="el-pct" style="color:${behind?'#e74c3c':'#2ecc71'}">${pct.toFixed(1)}%</span>
-        <span style="color:var(--dim);font-size:.8em"> ${d[el].t}/${expTotal} (${gap>=0?'+':''}${gap})</span>
-        <div class="el-bar"><div class="el-bar-fill" style="width:${Math.min(100,pct*100/70)}%;background:${L[el].c}"></div><div class="el-bar-exp"></div></div>
-        <div class="el-detail">S:${d[el].s}/${expSt} Sp:${d[el].sp}/${expSp}</div>
-        ${n>=10?`<span class="el-signal ${sigCls}">${sig}</span>`:''}
-      </div>
-    </div>`;
-  });
-  document.getElementById('elRows').innerHTML=html;
-
-  // Catch-up estimates
-  let catchH='';
-  if(n<5){
-    catchH='<div style="color:var(--dim);font-size:.8em">Need 5+ spins</div>';
-  }else{
-    ELS.forEach(el=>{
-      const pct=(d[el].t/n*100);
-      const diff=pct-EXP_HIT*100;
-      let est, prob;
-      if(Math.abs(diff)<3){
-        est='On target';prob='â';
-      }else if(diff<0){
-        // Behind: estimate spins to catch up
-        const deficit=Math.round(n*EXP_HIT)-d[el].t;
-        const spinsNeeded=Math.max(5,Math.round(deficit/EXP_HIT));
-        // Probability of catching up within X spins (rough binomial approximation)
-        const pCatch=Math.min(95,Math.round(100*(1-Math.exp(-spinsNeeded*0.03))));
-        est=`~${spinsNeeded} spins`;
-        prob=`${pCatch}%`;
-      }else{
-        est='Ahead +'+diff.toFixed(1)+'%';prob='â';
-      }
-      catchH+=`<div class="catchup-row">
-        <span class="el-s" style="color:${L[el].c}">${L[el].s}</span>
-        <span>${est}</span>
-        <span class="prob" style="color:${diff<-3?'#f1c40f':diff<0?'#2ecc71':'var(--dim)'}">${prob}</span>
-      </div>`;
-    });
-  }
-  document.getElementById('catchupRows').innerHTML=catchH;
+  banner.style.display='block';
+  const elName=lang==='zh'?L[worstEl].cn:L[worstEl].n;
+  document.getElementById('behindName').innerHTML=`<span style="color:${L[worstEl].c}">${L[worstEl].s} ${elName}</span>`;
+  document.getElementById('behindSt').innerHTML=stPct+'% <span style="color:var(--dim);font-size:.6em">/ 32.4%</span>';
+  document.getElementById('behindSp').innerHTML=spPct+'% <span style="color:var(--dim);font-size:.6em">/ 16.2%</span>';
+  document.getElementById('behindTotal').innerHTML=totalPct+'% <span style="color:var(--dim);font-size:.6em">/ 48.6%</span>';
 }
 
 // ===== ANALYSIS =====
@@ -610,10 +883,10 @@ function refreshAnalysis(){
   const n=spins.length;
   document.getElementById('aTotalSpins').textContent=n;
   if(!n){
-    document.getElementById('aBoxes').innerHTML='<span style="color:var(--dim);font-size:.8em">Record spins to see analysis</span>';
+    document.getElementById('aBoxes').innerHTML='<span style="color:var(--dim);font-size:.85em">'+(lang==='zh'?'记录旋转以查看分析':'Record spins to see analysis')+'</span>';
     document.getElementById('aBars').innerHTML='';document.getElementById('aBehind').innerHTML='';
     document.getElementById('aRec').style.display='none';document.getElementById('aSvS').innerHTML='';
-    document.getElementById('aConv').innerHTML='';return;
+    document.getElementById('aConv').innerHTML='';document.getElementById('endRec').style.display='none';return;
   }
 
   const d={};
@@ -626,10 +899,15 @@ function refreshAnalysis(){
   // Summary boxes
   let boxH='';
   ELS.forEach(el=>{
-    const pct=(d[el].t/n*100);const diff=pct-48.65;
+    const pct=(d[el].t/n*100);
+    const diff=pct-48.65;
     const cls=Math.abs(diff)<5?'near':diff>0?'above':'below';
-    const arrow=diff>2?'â²':diff<-2?'â¼':'â';
-    boxH+=`<div class="eb" style="border-color:${L[el].c}"><div class="val" style="color:${L[el].c}">${d[el].t}</div><div class="lbl">${d[el].s}S+${d[el].sp}Sp</div><div class="pct ${cls}">${pct.toFixed(1)}% ${arrow}</div></div>`;
+    const arrow=diff>2?'▲':diff<-2?'▼':'●';
+    boxH+=`<div class="eb" style="border-color:${L[el].c}">
+      <div class="val" style="color:${L[el].c}">${d[el].t}</div>
+      <div class="lbl">${d[el].s}S+${d[el].sp}Sp</div>
+      <div class="pct ${cls}">${pct.toFixed(1)}% ${arrow}</div>
+    </div>`;
   });
   document.getElementById('aBoxes').innerHTML=boxH;
 
@@ -637,156 +915,271 @@ function refreshAnalysis(){
   let barH='';
   ELS.forEach(el=>{
     const pct=(d[el].t/n*100);const diff=(pct-48.65).toFixed(1);const sign=diff>=0?'+':'';
-    barH+=`<div class="bar-row"><span class="bar-el" style="color:${L[el].c}">${L[el].s}</span><div class="bar-bg"><div class="bar-fill" style="width:${Math.max(2,pct)}%;background:${L[el].c}"></div><div class="bar-exp"></div></div><span class="bar-val">${pct.toFixed(1)}% (${sign}${diff})</span></div>`;
+    barH+=`<div class="bar-row"><span class="bar-el" style="color:${L[el].c}">${L[el].s}</span>
+      <div class="bar-bg"><div class="bar-fill" style="width:${Math.max(2,pct)}%;background:${L[el].c}"></div><div class="bar-exp"></div></div>
+      <span class="bar-val">${pct.toFixed(1)}% (${sign}${diff})</span></div>`;
   });
   document.getElementById('aBars').innerHTML=barH;
 
   // Behind analysis
   let behH='';
-  const expStPct=32.43, expSpPct=16.22;
+  const expHitPct=48.65,expStPct=32.43,expSpPct=16.22;
   ELS.forEach(el=>{
     const totalPct=(d[el].t/n*100);const stPct=(d[el].s/n*100);const spPct=(d[el].sp/n*100);
-    const behind=totalPct<48.65;const stBehind=stPct<expStPct;const spBehind=spPct<expSpPct;
+    const behind=totalPct<expHitPct;const stBehind=stPct<expStPct;const spBehind=spPct<expSpPct;
     const stGap=(expStPct-stPct).toFixed(1);const spGap=(expSpPct-spPct).toFixed(1);
     let signal='',sigClass='';
-    if(behind&&stBehind&&!spBehind){signal='STRAIGHT DUE â splits OK, straight behind by '+stGap+'%';sigClass='signal-hot'}
-    else if(behind&&stBehind&&spBehind&&parseFloat(stGap)>parseFloat(spGap)){signal='STRAIGHT MORE DUE ('+stGap+'% vs '+spGap+'%)';sigClass='signal-hot'}
-    else if(behind&&stBehind&&spBehind){signal='Both behind â S:-'+stGap+'% Sp:-'+spGap+'%';sigClass='signal-watch'}
-    else if(behind&&!stBehind){signal='Split behind â straight OK';sigClass='signal-watch'}
-    else{signal='On track or ahead';sigClass='signal-cold'}
-    behH+=`<div class="behind-row"><span class="el-name" style="color:${L[el].c}">${L[el].s} ${behind?'â¼':'â'}</span><span class="detail">S:${stPct.toFixed(1)}%/32.4 Sp:${spPct.toFixed(1)}%/16.2</span><span class="${sigClass}">${signal}</span></div>`;
+    if(behind&&stBehind&&!spBehind){signal=(lang==='zh'?'直注到期 — 分注正常，直注落后':'STRAIGHT DUE — splits OK, straight behind')+' '+stGap+'%';sigClass='signal-hot'}
+    else if(behind&&stBehind&&spBehind&&parseFloat(stGap)>parseFloat(spGap)){signal=(lang==='zh'?'直注更到期 — 两者都落后但直注差距更大':'STRAIGHT MORE DUE')+' ('+stGap+'% vs '+spGap+'%)';sigClass='signal-hot'}
+    else if(behind&&stBehind&&spBehind){signal=(lang==='zh'?'两者都落后':'Both behind')+' — S:-'+stGap+'%, Sp:-'+spGap+'%';sigClass='signal-watch'}
+    else if(behind&&!stBehind){signal=(lang==='zh'?'分注落后 — 直注正常':'Split behind — straight OK');sigClass='signal-watch'}
+    else{signal=(lang==='zh'?'正常或领先':'On track or ahead');sigClass='signal-cold'}
+    behH+=`<div class="behind-row"><span class="el-name" style="color:${L[el].c}">${L[el].s} ${behind?'▼':'✓'}</span>
+      <span class="detail">S:${stPct.toFixed(1)}%<span style="color:var(--dim)">/32.4</span> Sp:${spPct.toFixed(1)}%<span style="color:var(--dim)">/16.2</span></span>
+      <span class="${sigClass}">${signal}</span></div>`;
   });
   document.getElementById('aBehind').innerHTML=behH;
 
-  // Recommendation
-  const rec=document.getElementById('aRec');rec.style.display='block';
+  // Live recommendation
+  const rec=document.getElementById('aRec');
+  rec.style.display='block';
   const behindEls=ELS.filter(el=>(d[el].t/n*100)<43);
   const hotEls=ELS.filter(el=>(d[el].t/n*100)>54);
-  if(n>=30&&behindEls.length>=2){rec.className='rec rec-go';rec.innerHTML='ð '+behindEls.map(el=>L[el].s).join(',')+' behind â may be due for catch-up'}
-  else if(n>=30&&hotEls.length>=2){rec.className='rec rec-stop';rec.innerHTML='â ï¸ Multiple elements hot â consider banking profits'}
-  else if(n>=40){rec.className='rec rec-wait';rec.innerHTML='ð§ '+n+' spins â approaching session end (30-40 recommended)'}
-  else if(n>=5){rec.className='rec rec-go';rec.innerHTML='â¶ '+n+' spins. Need 20+ for patterns.'}
+  if(n>=30&&behindEls.length>=2){
+    rec.className='rec rec-go';
+    rec.innerHTML='📊 '+behindEls.map(el=>L[el].s).join(',')+' '+(lang==='zh'?'落后 — 这些元素可能会追赶':'behind — may be due for a catch-up');
+  }else if(n>=30&&hotEls.length>=2){
+    rec.className='rec rec-stop';
+    rec.innerHTML='⚠️ '+(lang==='zh'?'多个元素领先 — 考虑保存利润':'Multiple elements running hot — consider banking profits');
+  }else if(n>=40){
+    rec.className='rec rec-wait';
+    rec.innerHTML='🎯 '+n+' '+(lang==='zh'?'次旋转 — 接近推荐场次长度(30-40)':'spins — approaching recommended session length (30-40)');
+  }else if(n>=5){
+    rec.className='rec rec-go';
+    rec.innerHTML='▶ '+(lang==='zh'?'记录中...':'Recording... ')+n+' '+(lang==='zh'?'次旋转。需要25+次才有意义。':'spins. Need 25+ for patterns.');
+  }
 
   // Straight vs Split table
-  let svs='<table style="width:100%;border-collapse:collapse;font-size:.75em;color:var(--txt)"><tr><th style="text-align:left">Element</th><th>Straight</th><th>Exp</th><th>Gap</th><th>Split</th><th>Exp</th><th>Gap</th></tr>';
+  let svs=`<table style="width:100%;border-collapse:collapse;font-size:.8em;color:var(--txt)">
+    <tr><th style="text-align:left">${lang==='zh'?'元素':'Element'}</th><th>${lang==='zh'?'直注':'Straight'}</th><th>${lang==='zh'?'预期':'Exp'}</th><th>${lang==='zh'?'差距':'Gap'}</th><th>${lang==='zh'?'分注':'Split'}</th><th>${lang==='zh'?'预期':'Exp'}</th><th>${lang==='zh'?'差距':'Gap'}</th></tr>`;
   ELS.forEach(el=>{
     const stPct=(d[el].s/n*100);const spPct=(d[el].sp/n*100);
     const stExp=(n*12/37).toFixed(1);const spExp=(n*6/37).toFixed(1);
     const stGap=d[el].s-Math.round(n*12/37);const spGap=d[el].sp-Math.round(n*6/37);
-    svs+=`<tr><td style="color:${L[el].c};font-weight:700">${L[el].n}</td><td style="text-align:center">${d[el].s} (${stPct.toFixed(1)}%)</td><td style="text-align:center;color:var(--dim)">${stExp}</td><td style="text-align:center;color:${stGap>=0?'#2ecc71':'#e74c3c'}">${stGap>=0?'+':''}${stGap}</td><td style="text-align:center">${d[el].sp} (${spPct.toFixed(1)}%)</td><td style="text-align:center;color:var(--dim)">${spExp}</td><td style="text-align:center;color:${spGap>=0?'#2ecc71':'#e74c3c'}">${spGap>=0?'+':''}${spGap}</td></tr>`;
+    const eName=lang==='zh'?L[el].cn:L[el].n;
+    svs+=`<tr><td style="color:${L[el].c};font-weight:700">${eName}</td>
+      <td style="text-align:center">${d[el].s} (${stPct.toFixed(1)}%)</td><td style="text-align:center;color:var(--dim)">${stExp}</td>
+      <td style="text-align:center;color:${stGap>=0?'#2ecc71':'#e74c3c'}">${stGap>=0?'+':''}${stGap}</td>
+      <td style="text-align:center">${d[el].sp} (${spPct.toFixed(1)}%)</td><td style="text-align:center;color:var(--dim)">${spExp}</td>
+      <td style="text-align:center;color:${spGap>=0?'#2ecc71':'#e74c3c'}">${spGap>=0?'+':''}${spGap}</td></tr>`;
   });
-  svs+='</table>';document.getElementById('aSvS').innerHTML=svs;
+  svs+='</table>';
+  document.getElementById('aSvS').innerHTML=svs;
 
   // Convergence
   let convH='';
   ELS.forEach(el=>{
     const pct=(d[el].t/n*100);const diff=Math.abs(pct-48.65);
     let est;
-    if(diff<5)est='Near target â';
-    else{const target=18/37;const cur=d[el].t/n;const gap=Math.abs(cur-target);const needed=Math.round(gap*n/(0.05-gap+0.001));est='~'+Math.max(10,Math.min(200,needed))+' more spins'}
-    convH+=`<div class="bar-row"><span class="bar-el" style="color:${L[el].c}">${L[el].s}</span><span style="font-size:.8em;flex:1">${pct.toFixed(1)}% â ${est}</span></div>`;
+    if(diff<5)est=lang==='zh'?'接近目标 ✓':'Near target ✓';
+    else{const target=18/37;const cur=d[el].t/n;const gap=Math.abs(cur-target);const needed=Math.round(gap*n/(0.05-gap+0.001));
+      est='~'+Math.max(10,Math.min(200,needed))+' '+(lang==='zh'?'更多旋转':'more spins')}
+    convH+=`<div class="bar-row"><span class="bar-el" style="color:${L[el].c}">${L[el].s}</span>
+      <span style="font-size:.85em;flex:1">${pct.toFixed(1)}% → ${est}</span></div>`;
   });
   document.getElementById('aConv').innerHTML=convH;
+
+  // ===== SESSION END RECOMMENDATIONS =====
+  refreshEndRec(d,n);
+}
+
+function refreshEndRec(d,n){
+  const endRec=document.getElementById('endRec');
+  if(n<25){endRec.style.display='none';return}
+  endRec.style.display='block';
+
+  // Win/Loss estimate (15 units per spin, each straight pays 35:1, each split pays 17:1)
+  // Total bet per spin: 12 straight (1 unit each) + 3 splits (1 unit each) = 15 units
+  // Straight hit: win 35 units (net +35-15+1 = +21 from that spin)
+  // Split hit: win 17 units (net +17-15+1 = +3)
+  // Miss: lose 15 units
+  // We can estimate P&L from the spin data
+  let totalPL=0;
+  spins.forEach(sp=>{
+    // For each spin, player bets on ONE element at a time. But we track all 5.
+    // Actually, the player bets on one element. We don't know which.
+    // So we show P&L for EACH element if they had bet on it.
+  });
+
+  // Show per-element P&L estimate
+  const plData={};
+  ELS.forEach(el=>{
+    let pl=0;
+    spins.forEach(sp=>{
+      if(sp.hits[el]==='s') pl+=21; // straight: +35 win -15 cost +1 (get back the winning chip) = +21
+      else if(sp.hits[el]==='sp') pl+=3; // split: +17 win -15 cost +1 = +3
+      else pl-=15; // miss
+    });
+    plData[el]=pl;
+  });
+
+  // Find best and worst performing elements
+  const sortedEls=[...ELS].sort((a,b)=>plData[b]-plData[a]);
+  const bestEl=sortedEls[0];
+  const worstEl=sortedEls[sortedEls.length-1];
+
+  // Verdict
+  const verdict=document.getElementById('endVerdict');
+  const reasons=document.getElementById('endReasons');
+  let reasonsHTML='';
+
+  // Element catch-up predictions
+  const behindEls=ELS.filter(el=>{
+    const stPct=d[el].s/n;const spPct=d[el].sp/n;
+    return stPct<(12/37) || spPct<(6/37);
+  });
+
+  const dueEls=ELS.filter(el=>{
+    const stPct=d[el].s/n;
+    return stPct<(12/37)*0.85; // 15% below expected
+  });
+
+  // Overall verdict
+  const anyUp=Object.values(plData).some(v=>v>0);
+  const allDown=Object.values(plData).every(v=>v<0);
+  const maxPL=Math.max(...Object.values(plData));
+  const avgPL=Object.values(plData).reduce((a,b)=>a+b,0)/5;
+
+  if(n>=40 && avgPL>0){
+    verdict.style.background='rgba(231,76,60,.2)';verdict.style.color='#e74c3c';
+    verdict.textContent=lang==='zh'?'🛑 '+t('rec_stop_title'):'🛑 '+t('rec_stop_title');
+    reasonsHTML+=`<div class="reason">💰 ${t('rec_you_up')}</div>`;
+  }else if(dueEls.length>=2 && n<50){
+    verdict.style.background='rgba(46,204,113,.2)';verdict.style.color='#2ecc71';
+    verdict.textContent=lang==='zh'?'▶ '+t('rec_cont_title'):'▶ '+t('rec_cont_title');
+  }else if(n>=40 && allDown){
+    verdict.style.background='rgba(231,76,60,.2)';verdict.style.color='#e74c3c';
+    verdict.textContent='🛑 '+t('rec_stop_title');
+    reasonsHTML+=`<div class="reason">📉 ${t('rec_you_down')}</div>`;
+  }else{
+    verdict.style.background='rgba(241,196,15,.2)';verdict.style.color='#f1c40f';
+    verdict.textContent='⚠️ '+t('rec_caution_title');
+  }
+
+  // Per-element predictions
+  ELS.forEach(el=>{
+    const stPct=d[el].s/n;const spPct=d[el].sp/n;
+    const eName=lang==='zh'?L[el].cn:L[el].n;
+    const plStr=plData[el]>=0?'+'+plData[el]:plData[el];
+
+    if(stPct<(12/37)*0.85){
+      reasonsHTML+=`<div class="reason" style="border-left:3px solid ${L[el].c};padding-left:8px">
+        <span style="color:${L[el].c};font-weight:700">${eName}</span>: ${t('rec_element_due')} (P&L: ${plStr}u)</div>`;
+    }else if(stPct<(12/37) && spPct<(6/37)){
+      reasonsHTML+=`<div class="reason" style="border-left:3px solid ${L[el].c};padding-left:8px">
+        <span style="color:${L[el].c};font-weight:700">${eName}</span>: ${t('rec_both_behind')} (P&L: ${plStr}u)</div>`;
+    }else{
+      reasonsHTML+=`<div class="reason" style="border-left:3px solid ${L[el].c};padding-left:8px">
+        <span style="color:${L[el].c};font-weight:700">${eName}</span>: ${t('rec_on_track')} (P&L: ${plStr}u)</div>`;
+    }
+  });
+
+  reasons.innerHTML=reasonsHTML;
 }
 
 // ===== SESSIONS TAB =====
 function refreshSessions(){
   const div=document.getElementById('sessList');
-  if(!sessions.length){div.innerHTML='<p style="color:var(--dim);font-size:.8em">No saved sessions.</p>';document.getElementById('sessOptimal').innerHTML='';return}
-  let h='<table class="sess-table"><tr><th>Date</th><th>Casino</th><th>Spins</th><th>é</th><th>æ¨</th><th>æ°´</th><th>ç«</th><th>å</th><th></th></tr>';
+  if(!sessions.length){
+    div.innerHTML='<p style="color:var(--dim);font-size:.85em">'+t('no_sessions')+'</p>';
+    document.getElementById('sessOptimal').innerHTML='';return;
+  }
+
+  let h=`<table class="sess-table"><tr><th>${lang==='zh'?'日期':'Date'}</th><th>${lang==='zh'?'赌场':'Casino'}</th><th>${lang==='zh'?'旋转':'Spins'}</th><th>金</th><th>木</th><th>水</th><th>火</th><th>土</th><th></th></tr>`;
   sessions.forEach((s,i)=>{
     h+=`<tr><td>${s.date}</td><td>${s.casino}</td><td>${s.total}</td>`;
-    ELS.forEach(el=>{const e=s.elements[el]||{s:0,sp:0};h+=`<td>${e.s}+${e.sp}</td>`});
-    h+=`<td><button onclick="delSess(${i})" style="background:#c44;color:#fff;border:none;border-radius:3px;padding:2px 5px;cursor:pointer;font-size:.7em">X</button></td></tr>`;
+    ELS.forEach(el=>{
+      const e=s.elements[el]||{s:0,sp:0};
+      h+=`<td>${e.s}+${e.sp}</td>`;
+    });
+    h+=`<td><button onclick="delSess(${i})" style="background:#c44;color:#fff;border:none;border-radius:4px;padding:3px 6px;cursor:pointer;font-size:.75em">X</button></td></tr>`;
   });
-  h+='</table>';div.innerHTML=h;
+  h+='</table>';
+  div.innerHTML=h;
+
   analyzeOptimalSpins();
 }
 
-function delSess(i){if(!confirm('Delete session?'))return;sessions.splice(i,1);try{localStorage.setItem('lf_sess',JSON.stringify(sessions))}catch(e){}refreshSessions()}
+async function delSess(i){
+  if(!confirm(t('confirm_del')))return;
+  if(firebaseReady && currentUser && sessions[i]._id){
+    try{await db.collection('users').doc(currentUser.uid).collection('sessions').doc(sessions[i]._id).delete()}catch(e){}
+  }
+  sessions.splice(i,1);
+  if(!firebaseReady){try{localStorage.setItem('lf_sess',JSON.stringify(sessions))}catch(e){}}
+  refreshSessions();
+}
 
 function analyzeOptimalSpins(){
   const div=document.getElementById('sessOptimal');
-  const allSpins=[];
-  sessions.forEach(s=>{if(s.spins)s.spins.forEach(sp=>allSpins.push(sp))});
-  spins.forEach(sp=>allSpins.push(sp));
-  if(allSpins.length<10){div.innerHTML='<p style="color:var(--dim);font-size:.8em">Need 10+ spins across sessions.</p>';return}
-  const cnt={};ELS.forEach(el=>cnt[el]=0);
-  const target=18/37;let bestSpin=0,bestDev=999;const checkpoints=[];
-  for(let i=0;i<allSpins.length;i++){
-    const sp=allSpins[i];ELS.forEach(el=>{if(sp.hits[el]!=='-')cnt[el]++});
-    const nn=i+1;let totalDev=0;
-    ELS.forEach(el=>{totalDev+=Math.abs(cnt[el]/nn-target)});
-    if(nn>=10&&totalDev<bestDev){bestDev=totalDev;bestSpin=nn}
-    if(nn%5===0||nn===allSpins.length){
-      const snap={};ELS.forEach(el=>snap[el]=(cnt[el]/nn*100).toFixed(1));
-      checkpoints.push({spin:nn,dev:(totalDev/5*100).toFixed(1),snap});
-    }
+  // Analyze EACH session separately — don't merge data
+  const validSessions=sessions.filter(s=>s.spins&&s.spins.length>=25);
+
+  if(!validSessions.length){
+    div.innerHTML='<p style="color:var(--dim);font-size:.85em">'+t('need_more')+'</p>';return;
   }
-  let h=`<p style="font-size:.85em;margin-bottom:6px">Best: <strong style="color:var(--gold)">Spin #${bestSpin}</strong> (avg dev: ${(bestDev/5*100).toFixed(1)}%)</p>`;
-  h+='<table class="sess-table"><tr><th>Spin</th><th>Dev</th>';
-  ELS.forEach(el=>h+=`<th style="color:${L[el].c}">${L[el].s}</th>`);h+='</tr>';
-  checkpoints.slice(-15).forEach(cp=>{
-    h+=`<tr${cp.spin===bestSpin?' style="background:rgba(255,215,0,.15)"':''}><td>${cp.spin}</td><td>${cp.dev}%</td>`;
-    ELS.forEach(el=>{const v=parseFloat(cp.snap[el]);const diff=Math.abs(v-48.65);h+=`<td style="color:${diff<5?'#2ecc71':diff<10?'#f1c40f':'#e74c3c'}">${cp.snap[el]}%</td>`});
-    h+='</tr>';
+
+  // For each session, find the spin count where elements were closest to expected
+  const target=18/37;
+  let bestSpinCounts={}; // count of best spin numbers across sessions
+  let sessionResults=[];
+
+  validSessions.forEach((sess,si)=>{
+    const cnt={};ELS.forEach(el=>cnt[el]=0);
+    let bestSpin=0,bestDev=999;
+
+    for(let i=0;i<sess.spins.length;i++){
+      const sp=sess.spins[i];
+      ELS.forEach(el=>{if(sp.hits[el]!=='-')cnt[el]++});
+      const n=i+1;
+      let totalDev=0;
+      ELS.forEach(el=>totalDev+=Math.abs(cnt[el]/n-target));
+      if(n>=10 && totalDev<bestDev){bestDev=totalDev;bestSpin=n}
+    }
+
+    sessionResults.push({
+      date:sess.date, casino:sess.casino, total:sess.total,
+      bestSpin, bestDev:(bestDev/5*100).toFixed(1)
+    });
+
+    // Count frequency of best spin ranges
+    const bucket=Math.round(bestSpin/5)*5;
+    bestSpinCounts[bucket]=(bestSpinCounts[bucket]||0)+1;
   });
-  h+='</table>';div.innerHTML=h;
-}
 
-// ===== ACCOUNT TAB =====
-function refreshAcctTab(){
-  const div=document.getElementById('acctInfo');
-  if(currentUser){
-    div.innerHTML=`<p style="font-size:.9em"><strong>${currentUser.displayName||'Player'}</strong></p>
-      <p style="font-size:.8em;color:var(--dim)">${currentUser.email}</p>
-      <p style="font-size:.8em;margin-top:6px">Sessions saved: ${sessions.length}</p>
-      <p style="font-size:.8em">Total spins recorded: ${sessions.reduce((a,s)=>a+s.total,0)+spins.length}</p>`;
-  }else{
-    div.innerHTML='<p style="font-size:.8em;color:var(--dim)">Playing as Guest. Login to save data to cloud and contribute to community stats.</p>';
+  // Find most common optimal spin range
+  let mostCommonSpin=0,mostCommonCount=0;
+  for(const[spin,count] of Object.entries(bestSpinCounts)){
+    if(count>mostCommonCount){mostCommonCount=count;mostCommonSpin=parseInt(spin)}
   }
-  loadCommunityStats();
-}
 
-async function loadCommunityStats(){
-  const div=document.getElementById('communityStats');
-  if(!db||!currentUser){div.innerHTML='<p style="color:var(--dim);font-size:.8em">Login to see community data</p>';return}
-  try{
-    const snap=await db.collection('sessions').orderBy('ts','desc').limit(100).get();
-    if(snap.empty){div.innerHTML='<p style="color:var(--dim);font-size:.8em">No community data yet. Be the first to save a session!</p>';return}
-    let totalSpins=0,totalSess=0,players=new Set();
-    const totals={};ELS.forEach(el=>totals[el]={s:0,sp:0,t:0});
-    snap.forEach(doc=>{
-      const d=doc.data();totalSess++;totalSpins+=d.total||0;players.add(d.uid);
-      ELS.forEach(el=>{if(d.elements&&d.elements[el]){totals[el].s+=d.elements[el].s||0;totals[el].sp+=d.elements[el].sp||0;totals[el].t+=d.elements[el].t||0}});
-    });
-    let h=`<p style="font-size:.85em;margin-bottom:6px"><strong>${players.size}</strong> players | <strong>${totalSess}</strong> sessions | <strong>${totalSpins}</strong> total spins</p>`;
-    h+='<table style="width:100%;font-size:.75em;border-collapse:collapse;color:var(--txt)"><tr><th>Element</th><th>Hit%</th><th>Straight</th><th>Split</th></tr>';
-    ELS.forEach(el=>{
-      const pct=totalSpins>0?(totals[el].t/totalSpins*100).toFixed(1):'â';
-      h+=`<tr><td style="color:${L[el].c};font-weight:700">${L[el].n}</td><td style="text-align:center">${pct}%</td><td style="text-align:center">${totals[el].s}</td><td style="text-align:center">${totals[el].sp}</td></tr>`;
-    });
-    h+='</table>';div.innerHTML=h;
-  }catch(e){div.innerHTML=`<p style="color:var(--dim);font-size:.8em">Error loading community data</p>`}
-}
+  let h=`<p style="font-size:.9em;margin-bottom:8px">${lang==='zh'?'跨':'Across'} <strong style="color:var(--gold)">${validSessions.length}</strong> ${lang==='zh'?'个场次分析：':'sessions analyzed:'}</p>`;
 
-async function loadUserSessions(){
-  if(!db||!currentUser)return;
-  try{
-    const snap=await db.collection('sessions').where('uid','==',currentUser.uid).orderBy('ts','desc').limit(50).get();
-    if(!snap.empty){
-      const cloudSessions=[];
-      snap.forEach(doc=>{const d=doc.data();d.id=doc.id;cloudSessions.push(d)});
-      // Merge with local: add cloud sessions not already in local
-      const localTs=new Set(sessions.map(s=>s.ts));
-      cloudSessions.forEach(cs=>{if(!localTs.has(cs.ts))sessions.push(cs)});
-      try{localStorage.setItem('lf_sess',JSON.stringify(sessions))}catch(e){}
-    }
-  }catch(e){console.log('Cloud load error:',e)}
-}
+  if(validSessions.length>=3){
+    h+=`<p style="font-size:.9em;margin-bottom:8px;padding:8px;background:rgba(255,215,0,.1);border-radius:6px">
+      ${lang==='zh'?'最常见最佳旋转数：':'Most common optimal spin count:'} <strong style="color:var(--gold)">~${mostCommonSpin} ${lang==='zh'?'次旋转':'spins'}</strong>
+      (${lang==='zh'?'出现':'appeared'} ${mostCommonCount}/${validSessions.length} ${lang==='zh'?'次':'times'})</p>`;
+  }
 
-// Show auth screen on load (unless Firebase auto-logs in)
-if(!fbReady) document.getElementById('authOverlay').classList.remove('hidden');
+  h+=`<table class="sess-table"><tr><th>${lang==='zh'?'日期':'Date'}</th><th>${lang==='zh'?'赌场':'Casino'}</th><th>${lang==='zh'?'总数':'Total'}</th><th>${lang==='zh'?'最佳旋转#':'Best Spin#'}</th><th>${lang==='zh'?'平均偏差':'Avg Dev'}</th></tr>`;
+  sessionResults.forEach(r=>{
+    h+=`<tr><td>${r.date}</td><td>${r.casino}</td><td>${r.total}</td>
+      <td style="color:var(--gold);font-weight:700">${r.bestSpin}</td>
+      <td>${r.bestDev}%</td></tr>`;
+  });
+  h+='</table>';
+  div.innerHTML=h;
+}
 </script>
 </body>
-  </html>
+</html>
