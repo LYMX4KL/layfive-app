@@ -39,7 +39,7 @@ button{font-family:inherit}
 
 /* === AUTH SCREEN === */
 .auth-wrap{padding:20px;max-width:400px;margin:0 auto;text-align:center}
-.auth-wrap .logo-big{font-size:2em;color:var(--gold);font-weight:900;margin:30px 0 5px}
+.auth-wrap .logo-big{width:120px;height:120px;margin:30px auto 5px;display:block;border-radius:20px}
 .auth-wrap .sub{color:var(--dim);font-size:.85em;margin-bottom:25px}
 .auth-form{text-align:left}
 .auth-form label{font-size:.85em;color:var(--dim);display:block;margin:10px 0 4px}
@@ -64,20 +64,36 @@ button{font-family:inherit}
 .tab.on{color:var(--gold);border-bottom:2px solid var(--gold);margin-bottom:-2px}
 .pane{display:none}.pane.on{display:block}
 
-/* === NUMBER INPUT === */
-.nums{display:grid;grid-template-columns:repeat(10,1fr);gap:3px;padding:6px;background:#0a0a1a}
-.nb{height:38px;border:none;border-radius:6px;font-weight:700;font-size:1em;cursor:pointer;color:#fff}
-.nb:active{opacity:.7;transform:scale(.95)}
-.nb.r{background:#b22222}.nb.b{background:#333}.nb.g{background:#1a7a3a}
+/* === ACTIONS BAR === */
 .actions{display:flex;gap:4px;padding:4px 6px;background:#0a0a1a}
 .actions button{flex:1;padding:8px;border:none;border-radius:6px;font-weight:600;font-size:.85em;cursor:pointer}
 .btn-undo{background:#c44;color:#fff}.btn-new{background:#555;color:#fff}.btn-save{background:var(--gold);color:#000}
+.spin-count{text-align:center;padding:4px;font-size:.85em;color:var(--gold);font-weight:700;background:#0a0a1a}
 
-/* === PAGE NAV === */
-.page-nav{display:flex;align-items:center;justify-content:center;gap:8px;padding:6px;background:#0a0a1a}
-.page-nav button{background:#333;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:.9em;cursor:pointer;font-weight:600}
-.page-nav button:disabled{opacity:.3}
-.page-nav .page-info{color:var(--gold);font-weight:700;font-size:.95em;min-width:80px;text-align:center}
+/* === NUMBER PICKER POPUP === */
+.num-popup-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:center;justify-content:center}
+.num-popup{background:var(--card);border:2px solid var(--gold);border-radius:16px;padding:12px;width:90%;max-width:340px}
+.num-popup-title{color:var(--gold);font-weight:700;text-align:center;margin-bottom:8px;font-size:.9em}
+.num-popup-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.np-btn{height:42px;border:none;border-radius:8px;font-weight:700;font-size:1.1em;cursor:pointer;color:#fff}
+.np-btn:active{opacity:.7;transform:scale(.95)}
+.np-btn.r{background:#b22222}.np-btn.b{background:#444}.np-btn.g{background:#1a7a3a}
+
+/* === TAPPABLE DROP CELL === */
+.sn.empty{cursor:pointer;background:#fff8e0;border:1px dashed #cba}
+.sn.empty:active{background:#ffe8a0}
+
+/* === STRATEGY SIGNAL CELLS === */
+.sig-cell{cursor:pointer;font-size:.9em;font-weight:700}
+.sig-cold{color:#e74c3c}.sig-safe{color:#2ecc71}.sig-caution{color:#f1c40f}.sig-hot{color:#ff6600}
+.sig-count{color:#aaa;font-size:.75em;font-weight:400}
+
+/* === SIGNAL POPUP === */
+.sig-popup-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:center;justify-content:center}
+.sig-popup{background:var(--card);border:2px solid var(--gold);border-radius:16px;padding:16px;width:85%;max-width:320px}
+.sig-popup h3{color:var(--gold);text-align:center;margin-bottom:8px;font-size:1em}
+.sig-popup p{color:var(--txt);font-size:.85em;line-height:1.5;margin:4px 0}
+.sig-popup .close-btn{display:block;width:100%;padding:10px;background:var(--gold);color:#000;font-weight:700;border:none;border-radius:8px;cursor:pointer;margin-top:12px}
 
 /* === SCORECARD TABLE === */
 .sc-wrap{overflow-x:auto;overflow-y:auto;padding:4px}
@@ -223,7 +239,7 @@ button{font-family:inherit}
 <!-- ==================== AUTH SCREEN ==================== -->
 <div class="screen" id="screenAuth">
 <div class="auth-wrap">
-  <div class="logo-big">LayFive</div>
+  <img class="logo-big" src="icon.png" alt="LayFive">
   <div class="sub" data-i18n="auth_sub">Cruise Roulette Tracker 邮轮轮盘追踪</div>
 
   <!-- Login Form -->
@@ -294,18 +310,12 @@ button{font-family:inherit}
 
 <!-- ==================== SCORECARD TAB ==================== -->
 <div class="pane on" id="p0">
-  <div class="nums" id="numGrid"></div>
   <div class="actions">
     <button class="btn-undo" onclick="undo()" data-i18n="btn_undo">↩ Undo</button>
     <button class="btn-new" onclick="newSess()" data-i18n="btn_new">New</button>
     <button class="btn-save" onclick="saveSess()" data-i18n="btn_save">Save Session</button>
   </div>
-  <!-- Page Navigation -->
-  <div class="page-nav">
-    <button onclick="prevPage()" id="btnPrev" disabled>◀</button>
-    <span class="page-info" id="pageInfo">Page 1</span>
-    <button onclick="nextPage()" id="btnNext" disabled>▶</button>
-  </div>
+  <div class="spin-count" id="spinCount">0 spins</div>
   <!-- Scorecard -->
   <div class="sc-wrap">
     <table class="sc"><thead><tr>
@@ -322,6 +332,14 @@ button{font-family:inherit}
       <div class="stat"><span class="val" id="behindSp">—</span><br><span class="lbl" data-i18n="split">Split</span></div>
       <div class="stat"><span class="val" id="behindTotal">—</span><br><span class="lbl" data-i18n="total">Total</span></div>
     </div>
+  </div>
+</div>
+
+<!-- ==================== NUMBER PICKER POPUP ==================== -->
+<div class="num-popup-overlay" id="numPopup" style="display:none" onclick="closeNumPopup(event)">
+  <div class="num-popup">
+    <div class="num-popup-title" id="numPopupTitle">Select Number</div>
+    <div class="num-popup-grid" id="numPopupGrid"></div>
   </div>
 </div>
 
@@ -558,6 +576,7 @@ const T = {
   rec_early_title: {en:'KEEP PLAYING — Still Early', zh:'继续 — 仍然较早'},
   rec_you_up: {en:'You are UP. Consider stopping to lock in profits.', zh:'您目前盈利。考虑停止以锁定利润。'},
   rec_you_down: {en:'You are DOWN. Set a strict stop-loss limit.', zh:'您目前亏损。请设定严格止损。'},
+  select_number: {en:'Select Number — Row', zh:'选择号码 — 第'},
   rec_element_due: {en:'may catch up — straight hits are behind', zh:'可能追赶 — 直注落后'},
   rec_both_behind: {en:'is behind on both straight and split', zh:'直注和分注都落后'},
   rec_on_track: {en:'is on track or ahead', zh:'正常或领先'},
@@ -743,7 +762,7 @@ const L={
 };
 const ELS=['M','W','Wa','F','E'];
 const RED=[1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];
-const RPP=40;
+const EMPTY_ROWS=5; // number of empty rows to show ahead
 
 function hitType(num,el){
   if(L[el].st.includes(num))return 's';
@@ -753,7 +772,6 @@ function hitType(num,el){
 
 // ===== STATE =====
 let spins=[];
-let page=1;
 let sessions=[];
 
 // ===== INIT =====
@@ -784,52 +802,54 @@ let sessions=[];
   }
 
   document.getElementById('iDate').valueAsDate=new Date();
-  buildNums();
-  buildRows();
+  buildNumPopup();
   applyI18n();
   refreshAll();
 })();
 
-function buildNums(){
-  const g=document.getElementById('numGrid');
+// === NUMBER PICKER POPUP ===
+function buildNumPopup(){
+  const g=document.getElementById('numPopupGrid');
+  g.innerHTML='';
   for(let i=0;i<=36;i++){
     const b=document.createElement('button');
-    b.className='nb '+(i===0?'g':RED.includes(i)?'r':'b');
-    b.textContent=i;b.onclick=()=>addSpin(i);
+    b.className='np-btn '+(i===0?'g':RED.includes(i)?'r':'b');
+    b.textContent=i;
+    b.onclick=(e)=>{e.stopPropagation();pickNumber(i)};
     g.appendChild(b);
   }
 }
 
-function buildRows(){
-  const tb=document.getElementById('scBody');
-  tb.innerHTML='';
-  for(let r=1;r<=RPP;r++){
-    const tr=document.createElement('tr');
-    if(r===20)tr.className='rl';
-    tr.innerHTML=`<td class="rn">${r}</td><td class="sn" id="s${r}"></td>`+
-      `<td class="el cM" id="c${r}M"></td><td class="el cW" id="c${r}W"></td>`+
-      `<td class="el cWa" id="c${r}Wa"></td><td class="el cF" id="c${r}F"></td>`+
-      `<td class="el cE" id="c${r}E"></td>`;
-    tb.appendChild(tr);
-  }
+let pendingRow=null;
+function openNumPopup(row){
+  pendingRow=row;
+  const title=lang==='zh'?'选择号码 — 第 '+row+' 行':'Select Number — Row '+row;
+  document.getElementById('numPopupTitle').textContent=title;
+  document.getElementById('numPopup').style.display='flex';
+}
+function closeNumPopup(e){
+  if(e.target.id==='numPopup'){document.getElementById('numPopup').style.display='none';pendingRow=null}
+}
+function pickNumber(num){
+  document.getElementById('numPopup').style.display='none';
+  if(pendingRow!==null){addSpin(num);pendingRow=null}
 }
 
 function addSpin(num){
   const hits={};
   ELS.forEach(el=>hits[el]=hitType(num,el));
   spins.push({num,hits});
-  if(spins.length>page*RPP)page++;
   refreshAll();
-  const row=((spins.length-1)%RPP)+1;
-  const cell=document.getElementById('s'+row);
+  // Scroll to newly added row
+  const cell=document.getElementById('s'+spins.length);
   if(cell)cell.scrollIntoView({block:'nearest'});
 }
 
-function undo(){if(spins.length){spins.pop();if(spins.length<=(page-1)*RPP&&page>1)page--;refreshAll()}}
+function undo(){if(spins.length){spins.pop();refreshAll()}}
 
 function newSess(){
   if(spins.length&&!confirm(t('confirm_new')))return;
-  spins=[];page=1;refreshAll();
+  spins=[];refreshAll();
 }
 
 async function saveSess(){
@@ -873,10 +893,6 @@ async function loadSessions(){
   }catch(e){console.error('Load sessions error',e)}
 }
 
-// ===== PAGE NAV =====
-function prevPage(){if(page>1){page--;refreshScorecard()}}
-function nextPage(){const tp=Math.max(1,Math.ceil(spins.length/RPP));if(page<tp){page++;refreshScorecard()}}
-
 function showTab(i){
   document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('on',j===i));
   document.querySelectorAll('.pane').forEach((p,j)=>p.classList.toggle('on',j===i));
@@ -889,41 +905,166 @@ function showTab(i){
 function refreshAll(){refreshScorecard();refreshAnalysis();refreshBehindBanner()}
 
 function refreshScorecard(){
-  const tp=Math.max(1,Math.ceil(spins.length/RPP));
-  document.getElementById('btnPrev').disabled=page<=1;
-  document.getElementById('btnNext').disabled=page>=tp;
-  const pageLbl=lang==='zh'?'第 '+page+' 页 / '+tp:'Page '+page+' / '+tp;
-  document.getElementById('pageInfo').textContent=pageLbl+' ('+spins.length+' '+t('spins')+')';
+  document.getElementById('spinCount').textContent=spins.length+' '+t('spins');
 
-  const off=(page-1)*RPP;
-  const pageSpins=spins.slice(off,off+RPP);
+  const totalRows=spins.length+EMPTY_ROWS;
+  const tb=document.getElementById('scBody');
+  tb.innerHTML='';
+
   const cnt={},cntS={},cntSp={};
   ELS.forEach(el=>{cnt[el]=0;cntS[el]=0;cntSp[el]=0});
-  for(let i=0;i<off;i++){
-    ELS.forEach(el=>{
-      if(spins[i].hits[el]==='s'){cnt[el]++;cntS[el]++}
-      else if(spins[i].hits[el]==='sp'){cnt[el]++;cntSp[el]++}
-    });
-  }
-  for(let r=1;r<=RPP;r++){
-    const sp=pageSpins[r-1];
-    const sCell=document.getElementById('s'+r);
-    if(!sp){
-      sCell.textContent='';sCell.className='sn';
-      ELS.forEach(el=>{const c=document.getElementById('c'+r+el);c.innerHTML='';c.className='el c'+el});
-      continue;
+
+  // Compute strategy signals for the NEXT row
+  const signals=computeSignals();
+
+  for(let r=1;r<=totalRows;r++){
+    const tr=document.createElement('tr');
+    const sp=spins[r-1];
+
+    if(sp){
+      // Filled row
+      const numCls=sp.num===0?'sn-g':RED.includes(sp.num)?'sn-r':'sn-b';
+      let rowH=`<td class="rn">${r}</td><td class="sn ${numCls}" id="s${r}">${sp.num}</td>`;
+      ELS.forEach(el=>{
+        const type=sp.hits[el];
+        let cellContent='';
+        if(type==='s'){cnt[el]++;cntS[el]++;cellContent=`<span class="h-s">${cnt[el]}</span>`}
+        else if(type==='sp'){cnt[el]++;cntSp[el]++;cellContent=`<span class="h-sp"><span class="circ">${cnt[el]}</span></span>`}
+        rowH+=`<td class="el c${el}">${cellContent}</td>`;
+      });
+      tr.innerHTML=rowH;
+    }else{
+      // Empty row — tappable Drop cell + strategy signals on first empty row
+      const isSignalRow=(r===spins.length+1 && spins.length>=5);
+      let rowH=`<td class="rn">${r}</td><td class="sn empty" id="s${r}" onclick="openNumPopup(${r})"></td>`;
+      ELS.forEach(el=>{
+        if(isSignalRow && signals[el]){
+          const sig=signals[el];
+          rowH+=`<td class="el c${el} sig-cell ${sig.cls}" onclick="showSignalPopup('${el}')">${sig.symbol}<br><span class="sig-count">${sig.count}</span></td>`;
+        }else{
+          rowH+=`<td class="el c${el}"></td>`;
+        }
+      });
+      tr.innerHTML=rowH;
     }
-    sCell.textContent=sp.num;
-    sCell.className='sn '+(sp.num===0?'sn-g':RED.includes(sp.num)?'sn-r':'sn-b');
-    ELS.forEach(el=>{
-      const c=document.getElementById('c'+r+el);
-      c.className='el c'+el;
-      const type=sp.hits[el];
-      if(type==='s'){cnt[el]++;cntS[el]++;c.innerHTML=`<span class="h-s">${cnt[el]}</span>`}
-      else if(type==='sp'){cnt[el]++;cntSp[el]++;c.innerHTML=`<span class="h-sp"><span class="circ">${cnt[el]}</span></span>`}
-      else{c.innerHTML=''}
-    });
+    tb.appendChild(tr);
   }
+}
+
+// ===== STRATEGY SIGNALS =====
+function computeSignals(){
+  const n=spins.length;
+  const signals={};
+  if(n<5)return signals;
+
+  const WINDOW=Math.min(n,15); // look at last 15 spins (or all if <15)
+
+  ELS.forEach(el=>{
+    // Count recent hits/misses in the window
+    const recent=spins.slice(-WINDOW);
+    let hits=0,misses=0,streak=0,maxBlankStreak=0,curBlank=0,hitStreak=0,curHit=0;
+
+    recent.forEach(sp=>{
+      if(sp.hits[el]!=='-'){
+        hits++;curBlank=0;curHit++;
+        if(curHit>hitStreak)hitStreak=curHit;
+      }else{
+        misses++;curBlank++;curHit=0;
+        if(curBlank>maxBlankStreak)maxBlankStreak=curBlank;
+      }
+    });
+
+    // Check current streak (from end of all spins, not just window)
+    let endHitStreak=0,endMissStreak=0;
+    for(let i=spins.length-1;i>=0;i--){
+      if(spins[i].hits[el]!=='-'){endHitStreak++;if(endMissStreak>0)break}
+      else{endMissStreak++;if(endHitStreak>0)break}
+    }
+
+    // Determine signal
+    if(maxBlankStreak>=4){
+      // COLD: missed 4 in a row within the window
+      // Check if this is the ONLY element behind
+      const behindCount=ELS.filter(e=>{
+        const r=spins.slice(-WINDOW);
+        let bl=0,mxBl=0;
+        r.forEach(s=>{if(s.hits[e]==='-'){bl++;if(bl>mxBl)mxBl=bl}else bl=0});
+        return mxBl>=4;
+      }).length;
+      const onlyBehind=behindCount===1;
+      signals[el]={
+        symbol:'✕',cls:'sig-cold',count:hits+'/'+WINDOW,
+        type:'cold',onlyBehind,maxBlank:maxBlankStreak,window:WINDOW
+      };
+    }else if(endHitStreak>=4){
+      // HOT: 4+ consecutive hits
+      signals[el]={
+        symbol:'🔥',cls:'sig-hot',count:endHitStreak+'x',
+        type:'hot',hitStreak:endHitStreak
+      };
+    }else if(endHitStreak>=3){
+      // CAUTION: 3 consecutive hits
+      signals[el]={
+        symbol:'⚠',cls:'sig-caution',count:endHitStreak+'x',
+        type:'caution',hitStreak:endHitStreak
+      };
+    }else if(misses<=3 && maxBlankStreak<4){
+      // SAFE: missed less than 3 within window, no 4-blank streak
+      signals[el]={
+        symbol:'✓',cls:'sig-safe',count:hits+'/'+WINDOW,
+        type:'safe',hits,window:WINDOW
+      };
+    }
+    // If none of the above, no signal shown
+  });
+  return signals;
+}
+
+function showSignalPopup(el){
+  const signals=computeSignals();
+  const sig=signals[el];
+  if(!sig)return;
+
+  const eName=lang==='zh'?L[el].cn:L[el].n;
+  let title='',msg='';
+
+  if(sig.type==='cold'){
+    title=lang==='zh'?'❄️ 冷 — '+eName:'❄️ COLD — '+eName;
+    msg=lang==='zh'
+      ?`此元素在最近 ${sig.window} 次旋转中连续空白 ${sig.maxBlank} 次。命中率：${sig.count}。`
+      :`This element missed ${sig.maxBlank} in a row within the last ${sig.window} spins. Hit rate: ${sig.count}.`;
+    if(sig.onlyBehind){
+      msg+='<br><br>'+(lang==='zh'
+        ?'<strong style="color:#e74c3c">⚠️ 这是唯一落后的元素 — 它可能继续落后，不要追逐。</strong>'
+        :'<strong style="color:#e74c3c">⚠️ This is the ONLY element falling behind — it may stay behind. Don\'t chase it.</strong>');
+    }
+  }else if(sig.type==='safe'){
+    title=lang==='zh'?'✅ 安全 — '+eName:'✅ SAFE — '+eName;
+    msg=lang==='zh'
+      ?`此元素在最近 ${sig.window} 次旋转中命中 ${sig.hits} 次，没有连续4次空白。走势正常。`
+      :`This element hit ${sig.hits} times in the last ${sig.window} spins with no 4-blank streak. Tracking normally.`;
+  }else if(sig.type==='caution'){
+    title=lang==='zh'?'⚠️ 注意 — '+eName:'⚠️ CAUTION — '+eName;
+    msg=lang==='zh'
+      ?`此元素已连续命中 ${sig.hitStreak} 次。考虑找一个覆盖元素，或不要加注。`
+      :`This element has hit ${sig.hitStreak} times in a row. Consider finding a covering element or don't increase bet size.`;
+  }else if(sig.type==='hot'){
+    title=lang==='zh'?'🔥 热门 — '+eName:'🔥 HOT — '+eName;
+    msg=lang==='zh'
+      ?`此元素已连续命中 ${sig.hitStreak} 次！非常热门。跟随此元素，但做好准备随时切换。`
+      :`This element has hit ${sig.hitStreak} times in a row! Very hot. Follow it, but be ready to switch.`;
+  }
+
+  // Create popup
+  const overlay=document.createElement('div');
+  overlay.className='sig-popup-overlay';
+  overlay.onclick=(e)=>{if(e.target===overlay)overlay.remove()};
+  overlay.innerHTML=`<div class="sig-popup">
+    <h3>${title}</h3>
+    <p>${msg}</p>
+    <button class="close-btn" onclick="this.closest('.sig-popup-overlay').remove()">${lang==='zh'?'关闭':'Close'}</button>
+  </div>`;
+  document.body.appendChild(overlay);
 }
 
 // ===== MOST BEHIND BANNER =====
