@@ -193,6 +193,58 @@ button{font-family:inherit}
 .cover-info .detail{font-size:.85em;color:var(--dim);margin-top:4px}
 .split-label{font-size:.7em;color:#ff6600;text-align:center;margin-top:2px}
 
+/* === PRACTICE TAB === */
+.practice-wrap{padding:10px;background:var(--bg)}
+.practice-controls{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;background:var(--card);padding:8px;border-radius:8px}
+.control-group{display:flex;flex-direction:column;gap:4px}
+.control-group label{font-size:.75em;color:var(--dim);font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.btn-group{display:flex;gap:2px}
+.practice-wheel-btn,.practice-chip-btn{flex:1;padding:6px;border:1px solid #555;border-radius:4px;background:#222;color:var(--txt);font-weight:600;font-size:.8em;cursor:pointer;touch-action:manipulation}
+.practice-wheel-btn.active,.practice-chip-btn.active{border-color:var(--gold);background:rgba(255,215,0,.1);color:var(--gold)}
+.balance-display{font-size:1.1em;font-weight:700;color:var(--gold);text-align:center;padding:4px}
+.practice-wheel-container{display:flex;justify-content:center;margin:12px 0;touch-action:manipulation}
+#practiceCanvas{border:2px solid var(--gold);border-radius:8px;background:#0a0a1a;display:block;width:280px;height:280px}
+.practice-betting-area{margin:12px 0}
+.practice-table-header{text-align:center;font-size:.9em;color:var(--dim);margin-bottom:6px;font-weight:600}
+.practice-table{display:grid;grid-template-columns:1fr repeat(3,1fr);gap:2px;max-width:320px;margin:0 auto}
+.practice-cell{height:36px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85em;border-radius:4px;color:#fff;cursor:pointer;position:relative;touch-action:manipulation;user-select:none}
+.practice-cell:active{opacity:.8;transform:scale(.98)}
+.practice-cell.p-red{background:#b22222}
+.practice-cell.p-black{background:#333}
+.practice-cell.p-green{background:#1a7a3a}
+.practice-cell .chip-count{position:absolute;bottom:2px;right:4px;font-size:.65em;color:var(--gold);font-weight:700}
+.practice-cell.has-chips{box-shadow:inset 0 0 0 2px var(--gold)}
+.practice-actions{display:flex;gap:6px;margin:12px 0}
+.practice-btn{flex:1;padding:12px;border:none;border-radius:8px;font-weight:700;font-size:.95em;cursor:pointer;touch-action:manipulation}
+.practice-spin-btn{background:var(--gold);color:#000}
+.practice-spin-btn:active{opacity:.8}
+.practice-spin-btn:disabled{opacity:.5;cursor:not-allowed}
+.practice-clear-btn{background:#555;color:var(--txt)}
+.practice-result-panel{background:var(--card);border:2px solid var(--gold);border-radius:8px;padding:12px;margin:12px 0;text-align:center}
+.practice-result-number{font-size:3em;font-weight:900;color:var(--gold);margin:8px 0}
+.practice-result-text{font-size:1.1em;font-weight:700;color:var(--txt);margin:6px 0}
+.practice-payout{font-size:1.3em;font-weight:800;margin:6px 0}
+.practice-payout.win{color:#2ecc71}
+.practice-payout.loss{color:#e74c3c}
+.practice-history{background:var(--card);border-radius:8px;padding:10px;margin-bottom:8px}
+.practice-history h3{color:var(--gold);font-size:.95em;margin-bottom:6px}
+.practice-history-numbers{display:flex;gap:4px;flex-wrap:wrap}
+.history-num{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:4px;font-weight:700;font-size:.9em;color:#fff}
+.history-num.h-red{background:#b22222}
+.history-num.h-black{background:#333}
+.history-num.h-green{background:#1a7a3a}
+.practice-signals{background:var(--card);border-radius:8px;padding:10px}
+.practice-signals h3{color:var(--gold);font-size:.95em;margin-bottom:6px}
+.practice-signals-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.signal-badge{padding:8px;border-radius:6px;text-align:center;font-size:.75em;font-weight:700}
+.signal-badge .el-name{display:block;font-size:.9em;margin-bottom:2px}
+.signal-badge .signal-text{display:block;font-size:.7em}
+.sig-start{background:rgba(255,215,0,.15);border:1px solid var(--gold);color:var(--gold)}
+.sig-cold{background:rgba(231,76,60,.15);border:1px solid #e74c3c;color:#e74c3c}
+.sig-safe{background:rgba(46,204,113,.15);border:1px solid #2ecc71;color:#2ecc71}
+.sig-caution{background:rgba(241,196,15,.15);border:1px solid #f1c40f;color:#f1c40f}
+.sig-hot{background:rgba(255,102,0,.15);border:1px solid #ff6600;color:#ff6600}
+
 /* === RESPONSIVE === */
 @media(min-width:700px){body{max-width:700px;margin:0 auto}}
 </style>
@@ -308,6 +360,7 @@ button{font-family:inherit}
   <button class="tab" onclick="showTab(2)" data-i18n="tab_analysis">Analysis</button>
   <button class="tab" onclick="showTab(3)" data-i18n="tab_sessions">Sessions</button>
   <button class="tab" onclick="showTab(4)" data-i18n="tab_profile">Profile</button>
+  <button class="tab" onclick="showTab(5)" data-i18n="tab_practice">Practice</button>
 </div>
 
 <!-- ==================== SCORECARD TAB ==================== -->
@@ -467,6 +520,72 @@ button{font-family:inherit}
   </div>
 </div>
 
+<!-- ==================== PRACTICE TAB ==================== -->
+<div class="pane" id="p5">
+  <div class="practice-wrap">
+    <!-- Top Controls -->
+    <div class="practice-controls">
+      <div class="control-group">
+        <label data-i18n="practice_european">Wheel</label>
+        <div class="btn-group">
+          <button class="practice-wheel-btn active" onclick="setPracticeMode('eu')" data-i18n="practice_european">EU</button>
+          <button class="practice-wheel-btn" onclick="setPracticeMode('us')" data-i18n="practice_american">US</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <label data-i18n="practice_chip_size">Chip</label>
+        <div class="btn-group">
+          <button class="practice-chip-btn active" onclick="setPracticeChip(1)">1</button>
+          <button class="practice-chip-btn" onclick="setPracticeChip(5)">5</button>
+          <button class="practice-chip-btn" onclick="setPracticeChip(10)">10</button>
+          <button class="practice-chip-btn" onclick="setPracticeChip(25)">25</button>
+          <button class="practice-chip-btn" onclick="setPracticeChip(100)">100</button>
+        </div>
+      </div>
+      <div class="control-group">
+        <label data-i18n="practice_balance">Balance</label>
+        <div class="balance-display" id="practiceBalance">$1000</div>
+      </div>
+    </div>
+
+    <!-- Wheel Canvas -->
+    <div class="practice-wheel-container">
+      <canvas id="practiceCanvas" width="280" height="280"></canvas>
+    </div>
+
+    <!-- Betting Table -->
+    <div class="practice-betting-area">
+      <div class="practice-table-header" data-i18n="practice_bet">Total Bet: <span id="practiceBetAmount">0</span></div>
+      <div class="practice-table" id="practiceTable"></div>
+    </div>
+
+    <!-- Spin Controls -->
+    <div class="practice-actions">
+      <button class="practice-btn practice-spin-btn" id="practiceSpinBtn" onclick="practiceSpin()" data-i18n="practice_spin">SPIN</button>
+      <button class="practice-btn practice-clear-btn" onclick="practiceClear()" data-i18n="practice_clear">Clear</button>
+    </div>
+
+    <!-- Result Display -->
+    <div class="practice-result-panel" id="practiceResultPanel" style="display:none">
+      <div class="practice-result-number" id="practiceResultNum">0</div>
+      <div class="practice-result-text" id="practiceResultText">—</div>
+      <div class="practice-payout" id="practiceResultPayout">—</div>
+    </div>
+
+    <!-- Recent Spins History -->
+    <div class="practice-history">
+      <h3 data-i18n="practice_history">Recent Spins</h3>
+      <div class="practice-history-numbers" id="practiceHistoryNumbers"></div>
+    </div>
+
+    <!-- Strategy Signals -->
+    <div class="practice-signals">
+      <h3 data-i18n="practice_signal">Strategy Signals</h3>
+      <div class="practice-signals-grid" id="practiceSignals"></div>
+    </div>
+  </div>
+</div>
+
 </div><!-- end screenApp -->
 
 <script>
@@ -512,6 +631,7 @@ const T = {
   tab_sessions: {en:'Sessions', zh:'场次'},
   tab_cover: {en:'Cover', zh:'覆盖'},
   tab_profile: {en:'Profile', zh:'个人资料'},
+  tab_practice: {en:'Practice', zh:'练习'},
   cover_step1: {en:'STEP 1: Your Main Element (chasing)', zh:'第1步：主元素（追逐中）'},
   cover_step2: {en:'STEP 2: Choose Covering Element', zh:'第2步：选择覆盖元素'},
   cover_full: {en:'Full Set', zh:'全套'},
@@ -587,6 +707,21 @@ const T = {
   rec_element_due: {en:'may catch up — straight hits are behind', zh:'可能追赶 — 直注落后'},
   rec_both_behind: {en:'is behind on both straight and split', zh:'直注和分注都落后'},
   rec_on_track: {en:'is on track or ahead', zh:'正常或领先'},
+
+  // Practice tab
+  practice_european: {en:'European', zh:'欧洲轮'},
+  practice_american: {en:'American', zh:'美国轮'},
+  practice_chip_size: {en:'Chip Size', zh:'筹码大小'},
+  practice_balance: {en:'Balance', zh:'余额'},
+  practice_bet: {en:'Total Bet', zh:'总赌注'},
+  practice_spin: {en:'SPIN', zh:'旋转'},
+  practice_clear: {en:'Clear', zh:'清空'},
+  practice_result: {en:'Result', zh:'结果'},
+  practice_won: {en:'Won', zh:'赢了'},
+  practice_lost: {en:'输了', zh:'输了'},
+  practice_history: {en:'Recent Spins', zh:'最近旋转'},
+  practice_signal: {en:'Strategy Signals', zh:'策略信号'},
+  practice_start: {en:'START', zh:'开始'},
 };
 
 function t(key){ return (T[key]&&T[key][lang]) || key; }
@@ -1046,6 +1181,7 @@ function showTab(i){
   if(i===1)initCoverTab();
   if(i===2)refreshAnalysis();
   if(i===3)refreshSessions();
+  if(i===5)initPractice();
 }
 
 // ===== REFRESH ALL =====
@@ -1799,6 +1935,276 @@ function refreshPoolStats(){
   </div>`;
 
   div.innerHTML=h;
+}
+
+// ===== PRACTICE TAB =====
+const EU_WHEEL=[0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26];
+const US_WHEEL=[0,28,9,26,30,11,7,20,32,17,5,22,34,15,3,24,36,13,1,37,27,10,25,29,12,8,19,31,18,6,21,33,16,4,23,35,14,2];
+
+let practiceState={
+  mode:'eu',chipSize:1,balance:1000,bets:{},spins:[],isSpinning:false,
+  wheelAngle:0,currentResult:null,animationId:null
+};
+
+function initPractice(){
+  if(practiceState.initialized)return;
+  practiceState.initialized=true;
+  const canvas=document.getElementById('practiceCanvas');
+  if(canvas&&!canvas.practiceCtx){canvas.practiceCtx=canvas.getContext('2d')}
+  buildPracticeTable();
+  drawPracticeWheel();
+  refreshPracticeDisplay();
+}
+
+function setPracticeMode(mode){
+  practiceState.mode=mode;
+  document.querySelectorAll('.practice-wheel-btn').forEach(b=>b.classList.toggle('active',b.textContent.toLowerCase()===mode.toUpperCase()));
+  drawPracticeWheel();
+}
+
+function setPracticeChip(size){
+  practiceState.chipSize=size;
+  document.querySelectorAll('.practice-chip-btn').forEach(b=>b.classList.toggle('active',parseInt(b.textContent)===size));
+}
+
+function buildPracticeTable(){
+  const tbl=document.getElementById('practiceTable');
+  tbl.innerHTML='';
+  const wheelNums=practiceState.mode==='eu'?EU_WHEEL:US_WHEEL;
+  const zero=document.createElement('div');
+  zero.className='practice-cell p-green';zero.textContent='0';zero.id='pc_0';
+  zero.onclick=()=>placePracticeBet(0);
+  zero.style.gridColumn='1';zero.style.gridRow='1 / span 12';
+  tbl.appendChild(zero);
+  if(practiceState.mode==='us'){
+    const dz=document.createElement('div');
+    dz.className='practice-cell p-green';dz.textContent='00';dz.id='pc_37';
+    dz.onclick=()=>placePracticeBet(37);
+    dz.style.gridColumn='1';dz.style.gridRow='span 1';
+    tbl.appendChild(dz);
+  }
+  const tableLayout=[[3,3,1],[6,3,2],[9,3,3],[12,3,4],[15,3,5],[18,3,6],[21,3,7],[24,3,8],[27,3,9],[30,3,10],[33,3,11],[36,3,12],
+    [1,1,1],[4,1,2],[7,1,3],[10,1,4],[13,1,5],[16,1,6],[19,1,7],[22,1,8],[25,1,9],[28,1,10],[31,1,11],[34,1,12],
+    [2,2,1],[5,2,2],[8,2,3],[11,2,4],[14,2,5],[17,2,6],[20,2,7],[23,2,8],[26,2,9],[29,2,10],[32,2,11],[35,2,12],
+    [1,0,13],[2,1,13],[3,2,13],[4,0,14],[5,1,14],[6,2,14],[7,0,15],[8,1,15],[9,2,15],[10,0,16],[11,1,16],[12,2,16],
+    [13,0,17],[14,1,17],[15,2,17],[16,0,18],[17,1,18],[18,2,18],[19,0,19],[20,1,19],[21,2,19],[22,0,20],[23,1,20],[24,2,20],
+    [25,0,21],[26,1,21],[27,2,21],[28,0,22],[29,1,22],[30,2,22],[31,0,23],[32,1,23],[33,2,23],[34,0,24],[35,1,24],[36,2,24]];
+  tableLayout.forEach(([num,col,row])=>{
+    const cell=document.createElement('div');
+    cell.className='practice-cell '+(RED.includes(num)?'p-red':'p-black');
+    cell.textContent=num;cell.id='pc_'+num;
+    cell.onclick=()=>placePracticeBet(num);
+    cell.style.gridColumn=(col+1);cell.style.gridRow=row;
+    tbl.appendChild(cell);
+  });
+}
+
+function placePracticeBet(num){
+  if(practiceState.isSpinning)return;
+  const bet=practiceState.bets[num]||0;
+  practiceState.bets[num]=bet+practiceState.chipSize;
+  refreshPracticeDisplay();
+}
+
+function refreshPracticeDisplay(){
+  const totalBet=Object.values(practiceState.bets).reduce((a,b)=>a+b,0);
+  document.getElementById('practiceBalance').textContent='$'+practiceState.balance;
+  document.getElementById('practiceBetAmount').textContent=totalBet;
+  document.querySelectorAll('.practice-cell').forEach(cell=>{
+    const num=parseInt(cell.id.replace('pc_',''));
+    const bet=practiceState.bets[num];
+    cell.classList.toggle('has-chips',!!bet);
+    const cnt=cell.querySelector('.chip-count');
+    if(cnt)cnt.remove();
+    if(bet){
+      const span=document.createElement('span');
+      span.className='chip-count';span.textContent=bet;
+      cell.appendChild(span);
+    }
+  });
+  refreshPracticeHistory();
+  refreshPracticeSignals();
+}
+
+function practiceClear(){
+  practiceState.bets={};
+  practiceState.currentResult=null;
+  document.getElementById('practiceResultPanel').style.display='none';
+  refreshPracticeDisplay();
+}
+
+function practiceSpin(){
+  if(practiceState.isSpinning)return;
+  const totalBet=Object.values(practiceState.bets).reduce((a,b)=>a+b,0);
+  if(totalBet===0)return;
+  if(totalBet>practiceState.balance){alert(t('no_funds')||'Insufficient balance');return}
+
+  practiceState.isSpinning=true;
+  document.getElementById('practiceSpinBtn').disabled=true;
+  practiceState.balance-=totalBet;
+  document.getElementById('practiceBalance').textContent='$'+practiceState.balance;
+
+  const wheelNums=practiceState.mode==='eu'?EU_WHEEL:US_WHEEL;
+  const winNum=wheelNums[Math.floor(Math.random()*wheelNums.length)];
+
+  spinWheelAnimation(winNum,()=>{
+    calculatePracticePayouts(winNum);
+    practiceState.isSpinning=false;
+    document.getElementById('practiceSpinBtn').disabled=false;
+  });
+}
+
+function spinWheelAnimation(winNum,callback){
+  const duration=2500;const startTime=Date.now();const startAngle=practiceState.wheelAngle;
+  const wheelNums=practiceState.mode==='eu'?EU_WHEEL:US_WHEEL;
+  const winIdx=wheelNums.indexOf(winNum);
+  const anglePerSlot=360/wheelNums.length;
+  const finalAngle=-(winIdx*anglePerSlot)+90;
+
+  function animate(){
+    const elapsed=Date.now()-startTime;
+    const t=Math.min(elapsed/duration,1);
+    const eased=1-Math.pow(1-t,3);
+    let currentAngle=startAngle+eased*(finalAngle-startAngle);
+    while(currentAngle<0)currentAngle+=360;
+    practiceState.wheelAngle=currentAngle%360;
+    drawPracticeWheel();
+    if(t<1){practiceState.animationId=requestAnimationFrame(animate)}else{callback()}
+  }
+  animate();
+}
+
+function calculatePracticePayouts(winNum){
+  let totalWinnings=0;const betsWon=[];
+  const wheelNums=practiceState.mode==='eu'?EU_WHEEL:US_WHEEL;
+  const isRed=RED.includes(winNum);
+
+  Object.entries(practiceState.bets).forEach(([numStr,betAmt])=>{
+    const num=parseInt(numStr);let payout=0;
+    if(num===winNum){payout=betAmt*35}
+    else if(num<=36){
+      const row=Math.floor((num-1)/3)+1;
+      if(row*3===winNum||(row*3-1)===winNum||(row*3-2)===winNum){payout=betAmt*11}
+      const col=((num-1)%3)+1;
+      if(col+0===((winNum-1)%3)+1&&winNum>0&&winNum<=36){payout=betAmt*2}
+      if(num<=12&&winNum>0&&winNum<=12){payout=betAmt*2}
+      if(num<=18&&num>12&&winNum>12&&winNum<=24){payout=betAmt*2}
+      if(num<=36&&num>24&&winNum>24){payout=betAmt*2}
+      if(num===1&&winNum>0&&winNum<=18){payout=betAmt}
+      if(num===19&&winNum>18&&winNum<=36){payout=betAmt}
+      if(num===100&&isRed){payout=betAmt}
+      if(num===101&&!isRed&&winNum!==0){payout=betAmt}
+      if(num===102&&(winNum%2===1)&&winNum!==0){payout=betAmt}
+      if(num===103&&(winNum%2===0)&&winNum!==0){payout=betAmt}
+    }
+    if(payout>0){totalWinnings+=payout;betsWon.push(num)}
+  });
+
+  practiceState.balance+=totalWinnings;
+  practiceState.spins.push({num:winNum,bets:practiceState.bets,payout:totalWinnings,hits:{}});
+  ELS.forEach(el=>{practiceState.spins[practiceState.spins.length-1].hits[el]=hitType(winNum,el)});
+
+  const resultPanel=document.getElementById('practiceResultPanel');
+  const resultNum=document.getElementById('practiceResultNum');
+  const resultText=document.getElementById('practiceResultText');
+  const resultPayout=document.getElementById('practiceResultPayout');
+
+  resultNum.textContent=winNum;
+  resultNum.className=(winNum===0||winNum===37)?'practice-result-number':'practice-result-number';
+  if(RED.includes(winNum)){resultNum.style.color='#ff4444'}else if(winNum===0||winNum===37){resultNum.style.color='#44ff44'}else{resultNum.style.color='#888888'}
+
+  const totalBet=Object.values(practiceState.bets).reduce((a,b)=>a+b,0);
+  if(totalWinnings>totalBet){
+    resultText.textContent=t('practice_won')||'WIN!';resultText.style.color='#2ecc71';
+    resultPayout.textContent='+$'+totalWinnings;resultPayout.className='practice-payout win';
+  }else if(totalWinnings<totalBet){
+    resultText.textContent=t('practice_lost')||'LOST';resultText.style.color='#e74c3c';
+    resultPayout.textContent='-$'+(totalBet-totalWinnings);resultPayout.className='practice-payout loss';
+  }else{
+    resultText.textContent='PUSH';resultText.style.color='var(--gold)';
+    resultPayout.textContent='Even';resultPayout.className='practice-payout';
+  }
+
+  resultPanel.style.display='block';
+  practiceState.bets={};
+  document.getElementById('practiceBalance').textContent='$'+practiceState.balance;
+  refreshPracticeDisplay();
+}
+
+function refreshPracticeHistory(){
+  const hist=document.getElementById('practiceHistoryNumbers');
+  hist.innerHTML='';
+  const recent=practiceState.spins.slice(-10).reverse();
+  recent.forEach(sp=>{
+    const span=document.createElement('span');
+    span.className='history-num '+(sp.num===0||sp.num===37?'h-green':RED.includes(sp.num)?'h-red':'h-black');
+    span.textContent=sp.num;
+    hist.appendChild(span);
+  });
+}
+
+function refreshPracticeSignals(){
+  const sig=document.getElementById('practiceSignals');
+  if(practiceState.spins.length<5){sig.innerHTML='<div style="color:var(--dim);font-size:.85em;text-align:center">'+t('practice_start')+'</div>';return}
+
+  const signalData={};
+  const recent=practiceState.spins.slice(-15);
+  ELS.forEach(el=>{
+    let hits=0;recent.forEach(sp=>{if(sp.hits[el]!=='-')hits++});
+    const pct=(hits/recent.length)*100;const expected=48.65;
+    let sig='START',cls='sig-start';
+    if(pct<expected-15){sig='COLD';cls='sig-cold'}
+    else if(pct<expected-5){sig='SAFE';cls='sig-safe'}
+    else if(pct<expected+5){sig='SAFE';cls='sig-safe'}
+    else if(pct<expected+15){sig='CAUTION';cls='sig-caution'}
+    else{sig='HOT';cls='sig-hot'}
+    signalData[el]={sig,cls,hits};
+  });
+
+  const grid=document.getElementById('practiceSignalsGrid');
+  grid.innerHTML='';
+  ELS.forEach(el=>{
+    const data=signalData[el];
+    const badge=document.createElement('div');
+    badge.className='signal-badge '+data.cls;
+    badge.innerHTML='<span class="el-name">'+L[el].s+'</span><span class="signal-text">'+data.sig+'</span>';
+    grid.appendChild(badge);
+  });
+}
+
+function drawPracticeWheel(){
+  const canvas=document.getElementById('practiceCanvas');
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  const centerX=140,centerY=140,radius=120;
+
+  ctx.fillStyle='#0a0a1a';ctx.fillRect(0,0,280,280);
+
+  const wheelNums=practiceState.mode==='eu'?EU_WHEEL:US_WHEEL;
+  const slotAngle=360/wheelNums.length;
+
+  wheelNums.forEach((num,idx)=>{
+    const startAngle=(idx*slotAngle+practiceState.wheelAngle)*(Math.PI/180);
+    const endAngle=((idx+1)*slotAngle+practiceState.wheelAngle)*(Math.PI/180);
+
+    let color='#333';
+    if(num===0||num===37){color='#1a7a3a'}
+    else if(RED.includes(num)){color='#b22222'}
+
+    ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(centerX,centerY);
+    ctx.arc(centerX,centerY,radius,startAngle,endAngle);ctx.closePath();ctx.fill();
+
+    ctx.strokeStyle='#444';ctx.lineWidth=1;ctx.stroke();
+
+    const labelAngle=(startAngle+endAngle)/2;
+    const labelX=centerX+Math.cos(labelAngle)*(radius*0.65);
+    const labelY=centerY+Math.sin(labelAngle)*(radius*0.65);
+    ctx.fillStyle='#fff';ctx.font='bold 12px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(num.toString(),labelX,labelY);
+  });
+
+  ctx.fillStyle='#ffd700';ctx.beginPath();ctx.moveTo(centerX,centerY-radius-15);
+  ctx.lineTo(centerX-8,centerY-radius);ctx.lineTo(centerX+8,centerY-radius);ctx.closePath();ctx.fill();
 }
 
 // ===== COVER TAB =====
