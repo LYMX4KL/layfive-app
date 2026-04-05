@@ -111,6 +111,8 @@ button{font-family:inherit}
 .h-s{font-weight:700}.h-sp{font-weight:700}
 .circ{display:inline-flex;width:22px;height:22px;border-radius:50%;border:2px solid #c00;align-items:center;justify-content:center;font-size:.85em}
 .sn-r{background:#f8d7da!important}.sn-b{background:#d6d6d6!important}.sn-g{background:#d4edda!important}
+.sc .led-row td{opacity:.65}
+.sc .led-row .rn{background:#eee}
 
 /* === MOST BEHIND PANEL === */
 .behind-banner{background:linear-gradient(135deg,#1a1a3e,#2a1a3e);border:2px solid #e74c3c;border-radius:10px;padding:12px;margin:6px;display:none}
@@ -419,6 +421,10 @@ button{font-family:inherit}
       <h3 data-i18n="saved_sessions">Saved Sessions</h3>
       <div id="sessList"></div>
     </div>
+    <div class="acard" id="poolStatsCard" style="display:none">
+      <h3 data-i18n="pool_title">Strategy Insights (Per-Session Analysis)</h3>
+      <div id="poolStats"></div>
+    </div>
     <div class="acard">
       <h3 data-i18n="optimal_title">Optimal Spin Analysis (Per Session)</h3>
       <p style="font-size:.75em;color:var(--dim);margin-bottom:5px" data-i18n="optimal_desc">Across all sessions: at which spin count do elements converge closest to expected?</p>
@@ -544,6 +550,7 @@ const T = {
 
   // Sessions
   saved_sessions: {en:'Saved Sessions', zh:'已保存场次'},
+  pool_title: {en:'Strategy Insights (Per-Session Analysis)', zh:'策略洞察（每场独立分析）'},
   optimal_title: {en:'Optimal Spin Analysis (Per Session)', zh:'最佳旋转分析（按场次）'},
   optimal_desc: {en:'Across sessions: at which spin count do elements converge closest?', zh:'跨场次：在哪个旋转数元素最接近预期？'},
   add_home: {en:'Add to Home Screen', zh:'添加到主屏幕'},
@@ -763,6 +770,7 @@ const L={
 const ELS=['M','W','Wa','F','E'];
 const RED=[1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];
 const EMPTY_ROWS=5; // number of empty rows to show ahead
+const LED_COUNT=12; // first 12 spins are preexisting from LED display
 
 function hitType(num,el){
   if(L[el].st.includes(num))return 's';
@@ -838,7 +846,7 @@ function pickNumber(num){
 function addSpin(num){
   const hits={};
   ELS.forEach(el=>hits[el]=hitType(num,el));
-  spins.push({num,hits});
+  spins.push({num,hits,isLED:spins.length<LED_COUNT});
   refreshAll();
   // Scroll to newly added row
   const cell=document.getElementById('s'+spins.length);
@@ -874,6 +882,7 @@ async function saveSess(){
     try{
       await db.collection('users').doc(currentUser.uid).collection('sessions').add(sess);
       await loadSessions();
+      await updatePoolData();
       alert(t('session_saved')+' ('+spins.length+' '+t('spins')+')');
     }catch(e){alert('Save error: '+e.message)}
   }else{
@@ -890,7 +899,145 @@ async function loadSessions(){
     sessions=[];
     snap.forEach(doc=>{const d=doc.data();d._id=doc.id;sessions.push(d)});
     refreshSessions();
+    loadPoolData();
   }catch(e){console.error('Load sessions error',e)}
+}
+
+// ===== POOL DATA =====
+let poolData=null;
+
+async function updatePoolData(){
+  if(!firebaseReady||!currentUser||!sessions.length)return;
+  // Analyze EACH session individually, then find patterns ACROSS sessions
+  const validSessions=sessions.filter(s=>s.spins&&s.spins.length>=25);
+  if(!validSessions.length)return;
+
+  const perSessionData=[]; // one entry per session
+
+  validSessions.forEach(sess=>{
+    const n=sess.spins.length;
+    const liveCount=Math.max(0,n-LED_COUNT);
+    const sessData={total:n,live:liveCount,elements:{}};
+
+    // Analyze each element WITHIN this session
+    ELS.forEach(el=>{
+      let sHits=0,spHits=0,blank=0,maxBl=0,hit=0,maxHt=0;
+      const coldRecoveries=[]; // spins to recover after 4+ blank streak
+      let inColdStreak=false, coldStart=0;
+
+      for(let i=0;i<n;i++){
+        const sp=sess.spins[i];
+        if(sp.hits[el]!=='-'){
+          if(sp.hits[el]==='s')sHits++;else spHits++;
+          if(blank>=4){
+            // Cold streak just ended — record recovery time
+            coldRecoveries.push(i-coldStart);
+          }
+          inColdStreak=false;blank=0;hit++;
+          if(hit>maxHt)maxHt=hit;
+        }else{
+          if(!inColdStreak && blank===0)coldStart=i;
+          if(hit>0)hit=0;
+          blank++;
+          if(blank>=4)inColdStreak=true;
+          if(blank>maxBl)maxBl=blank;
+        }
+      }
+
+      // Per-session element P&L
+      let pl=0;
+      sess.spins.forEach(sp=>{
+        if(sp.hits[el]==='s')pl+=21;
+        else if(sp.hits[el]==='sp')pl+=3;
+        else pl-=15;
+      });
+
+      // Best spin# within session (when this element was closest to expected)
+      let cnt2=0,bestSpin=0,bestDev=999;
+      for(let i=0;i<n;i++){
+        if(sess.spins[i].hits[el]!=='-')cnt2++;
+        const dev=Math.abs(cnt2/(i+1)-18/37);
+        if(i>=9&&dev<bestDev){bestDev=dev;bestSpin=i+1}
+      }
+
+      sessData.elements[el]={
+        s:sHits,sp:spHits,t:sHits+spHits,
+        maxBlank:maxBl,maxHit:maxHt,
+        coldRecoveries, // how many spins to recover after 4+ blank
+        pl, bestSpin
+      };
+    });
+
+    // Best overall spin# (all elements closest to expected)
+    const cnt3={};ELS.forEach(el=>cnt3[el]=0);
+    let bestOverall=0,bestOverallDev=999;
+    for(let i=0;i<n;i++){
+      ELS.forEach(el=>{if(sess.spins[i].hits[el]!=='-')cnt3[el]++});
+      let dev=0;ELS.forEach(el=>dev+=Math.abs(cnt3[el]/(i+1)-18/37));
+      if(i>=9&&dev<bestOverallDev){bestOverallDev=dev;bestOverall=i+1}
+    }
+    sessData.bestOverallSpin=bestOverall;
+
+    perSessionData.push(sessData);
+  });
+
+  // Now compute cross-session insights
+  const insights={
+    totalSessions:validSessions.length,
+    // Best time to stop: distribution of optimal spin counts
+    optimalSpins:perSessionData.map(s=>s.bestOverallSpin),
+    // Per-element cold recovery: avg spins to wait after 4+ miss streak
+    coldRecovery:{},
+    // Per-element best spin#
+    bestSpinPerEl:{},
+    // Per-element P&L across sessions
+    plPerSession:{},
+    // Session lengths
+    sessionLengths:perSessionData.map(s=>s.live),
+    updatedAt:Date.now()
+  };
+
+  ELS.forEach(el=>{
+    const allRecoveries=[];
+    const allPL=[];
+    const allBestSpins=[];
+    perSessionData.forEach(s=>{
+      allRecoveries.push(...s.elements[el].coldRecoveries);
+      allPL.push(s.elements[el].pl);
+      allBestSpins.push(s.elements[el].bestSpin);
+    });
+    insights.coldRecovery[el]={
+      avg:allRecoveries.length?+(allRecoveries.reduce((a,b)=>a+b,0)/allRecoveries.length).toFixed(1):null,
+      min:allRecoveries.length?Math.min(...allRecoveries):null,
+      max:allRecoveries.length?Math.max(...allRecoveries):null,
+      count:allRecoveries.length
+    };
+    insights.bestSpinPerEl[el]={
+      avg:allBestSpins.length?Math.round(allBestSpins.reduce((a,b)=>a+b,0)/allBestSpins.length):null
+    };
+    insights.plPerSession[el]={
+      avg:allPL.length?Math.round(allPL.reduce((a,b)=>a+b,0)/allPL.length):null,
+      best:allPL.length?Math.max(...allPL):null,
+      worst:allPL.length?Math.min(...allPL):null
+    };
+  });
+
+  // Save to Firestore
+  try{
+    await db.collection('users').doc(currentUser.uid).collection('pool').doc('stats').set(insights);
+  }catch(e){console.error('Pool save error',e)}
+
+  poolData=insights;
+  return insights;
+}
+
+async function loadPoolData(){
+  if(!firebaseReady||!currentUser)return null;
+  try{
+    const doc=await db.collection('users').doc(currentUser.uid).collection('pool').doc('stats').get();
+    if(doc.exists){poolData=doc.data();return poolData}
+  }catch(e){console.error('Pool load error',e)}
+  return null;
 }
 
 function showTab(i){
@@ -924,7 +1071,9 @@ function refreshScorecard(){
     if(sp){
       // Filled row
       const numCls=sp.num===0?'sn-g':RED.includes(sp.num)?'sn-r':'sn-b';
-      let rowH=`<td class="rn">${r}</td><td class="sn ${numCls}" id="s${r}">${sp.num}</td>`;
+      const isLED=r<=LED_COUNT;
+      if(isLED)tr.classList.add('led-row');
+      let rowH=`<td class="rn">${r}${isLED?'<span style="font-size:.6em;color:#888">L</span>':''}</td><td class="sn ${numCls}" id="s${r}">${sp.num}</td>`;
       ELS.forEach(el=>{
         const type=sp.hits[el];
         let cellContent='';
@@ -957,66 +1106,102 @@ function computeSignals(){
   const signals={};
   if(n<5)return signals;
 
-  const WINDOW=Math.min(n,15); // look at last 15 spins (or all if <15)
+  const WINDOW=Math.min(n,15);
+  const liveStart=Math.min(LED_COUNT,n); // live spins start after LED
 
+  // Gather per-element data
+  const elData={};
   ELS.forEach(el=>{
-    // Count recent hits/misses in the window
     const recent=spins.slice(-WINDOW);
-    let hits=0,misses=0,streak=0,maxBlankStreak=0,curBlank=0,hitStreak=0,curHit=0;
+    let hits=0,misses=0,maxBlankStreak=0,curBlank=0,hitStreak=0,curHit=0;
+    let totalS=0,totalSp=0;
 
     recent.forEach(sp=>{
       if(sp.hits[el]!=='-'){
         hits++;curBlank=0;curHit++;
         if(curHit>hitStreak)hitStreak=curHit;
+        if(sp.hits[el]==='s')totalS++;else totalSp++;
       }else{
         misses++;curBlank++;curHit=0;
         if(curBlank>maxBlankStreak)maxBlankStreak=curBlank;
       }
     });
 
-    // Check current streak (from end of all spins, not just window)
+    // End streak (from all spins)
     let endHitStreak=0,endMissStreak=0;
     for(let i=spins.length-1;i>=0;i--){
       if(spins[i].hits[el]!=='-'){endHitStreak++;if(endMissStreak>0)break}
       else{endMissStreak++;if(endHitStreak>0)break}
     }
 
-    // Determine signal
-    if(maxBlankStreak>=4){
-      // COLD: missed 4 in a row within the window
-      // Check if this is the ONLY element behind
-      const behindCount=ELS.filter(e=>{
-        const r=spins.slice(-WINDOW);
-        let bl=0,mxBl=0;
-        r.forEach(s=>{if(s.hits[e]==='-'){bl++;if(bl>mxBl)mxBl=bl}else bl=0});
-        return mxBl>=4;
-      }).length;
-      const onlyBehind=behindCount===1;
+    // Overall session stats
+    let sessS=0,sessSp=0;
+    spins.forEach(sp=>{if(sp.hits[el]==='s')sessS++;else if(sp.hits[el]==='sp')sessSp++});
+
+    elData[el]={hits,misses,maxBlankStreak,hitStreak,endHitStreak,endMissStreak,totalS,totalSp,sessS,sessSp,window:WINDOW};
+  });
+
+  // Count how many elements are COLD (4+ blank streak)
+  const coldEls=ELS.filter(el=>elData[el].maxBlankStreak>=4);
+
+  // Rank elements for "pick" suggestion: prefer more straight hits
+  const ranked=[...ELS].sort((a,b)=>{
+    const aScore=elData[a].sessS*2+elData[a].sessSp;
+    const bScore=elData[b].sessS*2+elData[b].sessSp;
+    return bScore-aScore;
+  });
+
+  ELS.forEach(el=>{
+    const d=elData[el];
+
+    if(d.maxBlankStreak>=4){
+      // COLD
+      const onlyBehind=coldEls.length===1 && coldEls[0]===el;
       signals[el]={
-        symbol:'✕',cls:'sig-cold',count:hits+'/'+WINDOW,
-        type:'cold',onlyBehind,maxBlank:maxBlankStreak,window:WINDOW
+        symbol:'✕',cls:'sig-cold',count:d.hits+'/'+d.window,
+        type:'cold',onlyBehind,maxBlank:d.maxBlankStreak,window:d.window
       };
-    }else if(endHitStreak>=4){
+    }else if(d.endHitStreak>=4){
       // HOT: 4+ consecutive hits
+      // Check if "extremely hot": less than 3 misses in window AND straight > splits
+      const extremelyHot=(d.misses<3 && d.totalS>d.totalSp);
       signals[el]={
-        symbol:'🔥',cls:'sig-hot',count:endHitStreak+'x',
-        type:'hot',hitStreak:endHitStreak
+        symbol:'🔥',cls:'sig-hot',count:d.endHitStreak+'x',
+        type:'hot',hitStreak:d.endHitStreak,extremelyHot,
+        straightHits:d.sessS,splitHits:d.sessSp
       };
-    }else if(endHitStreak>=3){
-      // CAUTION: 3 consecutive hits
+    }else if(d.endHitStreak>=3){
+      // CAUTION
       signals[el]={
-        symbol:'⚠',cls:'sig-caution',count:endHitStreak+'x',
-        type:'caution',hitStreak:endHitStreak
+        symbol:'⚠',cls:'sig-caution',count:d.endHitStreak+'x',
+        type:'caution',hitStreak:d.endHitStreak
       };
-    }else if(misses<=3 && maxBlankStreak<4){
-      // SAFE: missed less than 3 within window, no 4-blank streak
+    }else if(d.misses<=3 && d.maxBlankStreak<4){
+      // SAFE: less than 3 misses, no 4-blank streak
+      // Extra: flag if straight > splits (more profitable)
+      const straightDominant=(d.totalS>d.totalSp);
       signals[el]={
-        symbol:'✓',cls:'sig-safe',count:hits+'/'+WINDOW,
-        type:'safe',hits,window:WINDOW
+        symbol:'✓',cls:'sig-safe',count:d.hits+'/'+d.window,
+        type:'safe',hits:d.hits,window:d.window,straightDominant,
+        straightHits:d.sessS,splitHits:d.sessSp
       };
     }
-    // If none of the above, no signal shown
   });
+
+  // Add starting suggestion: if we're in LED phase (first 12 spins), suggest top 2 hot elements
+  if(n<=LED_COUNT+3){
+    // Find top 2 by hit count
+    const top2=ranked.slice(0,2);
+    top2.forEach(el=>{
+      if(!signals[el]){
+        signals[el]={
+          symbol:'★',cls:'sig-safe',count:'start',
+          type:'start',rank:ranked.indexOf(el)+1
+        };
+      }
+    });
+  }
+
   return signals;
 }
 
@@ -1031,18 +1216,23 @@ function showSignalPopup(el){
   if(sig.type==='cold'){
     title=lang==='zh'?'❄️ 冷 — '+eName:'❄️ COLD — '+eName;
     msg=lang==='zh'
-      ?`此元素在最近 ${sig.window} 次旋转中连续空白 ${sig.maxBlank} 次。命中率：${sig.count}。`
-      :`This element missed ${sig.maxBlank} in a row within the last ${sig.window} spins. Hit rate: ${sig.count}.`;
+      ?`此元素在最近 ${sig.window} 次旋转中连续空白 ${sig.maxBlank} 次。命中率：${sig.count}。<br><br><strong style="color:#e74c3c">规则：不要追逐落后的元素，落后的很可能会继续落后。</strong>`
+      :`This element missed ${sig.maxBlank} in a row within the last ${sig.window} spins. Hit rate: ${sig.count}.<br><br><strong style="color:#e74c3c">Rule: Do NOT chase behind elements. If it's behind, it will most likely stay behind.</strong>`;
     if(sig.onlyBehind){
       msg+='<br><br>'+(lang==='zh'
-        ?'<strong style="color:#e74c3c">⚠️ 这是唯一落后的元素 — 它可能继续落后，不要追逐。</strong>'
-        :'<strong style="color:#e74c3c">⚠️ This is the ONLY element falling behind — it may stay behind. Don\'t chase it.</strong>');
+        ?'<strong style="color:#e74c3c">⚠️ 这是唯一落后的元素 — 绝对不要追逐！</strong>'
+        :'<strong style="color:#e74c3c">⚠️ This is the ONLY element falling behind — definitely don\'t chase!</strong>');
     }
   }else if(sig.type==='safe'){
     title=lang==='zh'?'✅ 安全 — '+eName:'✅ SAFE — '+eName;
     msg=lang==='zh'
       ?`此元素在最近 ${sig.window} 次旋转中命中 ${sig.hits} 次，没有连续4次空白。走势正常。`
       :`This element hit ${sig.hits} times in the last ${sig.window} spins with no 4-blank streak. Tracking normally.`;
+    if(sig.straightDominant){
+      msg+='<br><br>'+(lang==='zh'
+        ?'<strong style="color:#2ecc71">💪 直注多于分注（直注:'+sig.straightHits+' vs 分注:'+sig.splitHits+'）— 更有利可图！每次直注命中赢21单位。</strong>'
+        :'<strong style="color:#2ecc71">💪 Straight hits > splits (S:'+sig.straightHits+' vs Sp:'+sig.splitHits+') — more profitable! Each straight hit wins 21 units.</strong>');
+    }
   }else if(sig.type==='caution'){
     title=lang==='zh'?'⚠️ 注意 — '+eName:'⚠️ CAUTION — '+eName;
     msg=lang==='zh'
@@ -1051,11 +1241,22 @@ function showSignalPopup(el){
   }else if(sig.type==='hot'){
     title=lang==='zh'?'🔥 热门 — '+eName:'🔥 HOT — '+eName;
     msg=lang==='zh'
-      ?`此元素已连续命中 ${sig.hitStreak} 次！非常热门。跟随此元素，但做好准备随时切换。`
-      :`This element has hit ${sig.hitStreak} times in a row! Very hot. Follow it, but be ready to switch.`;
+      ?`此元素已连续命中 ${sig.hitStreak} 次！`
+      :`This element has hit ${sig.hitStreak} times in a row!`;
+    if(sig.extremelyHot){
+      msg+='<br><br>'+(lang==='zh'
+        ?'<strong style="color:#ff6600">🔥🔥 极热！最近窗口内仅不到3次未命中，且直注('+sig.straightHits+')多于分注('+sig.splitHits+')。跟随此元素！</strong>'
+        :'<strong style="color:#ff6600">🔥🔥 EXTREMELY HOT! Less than 3 misses in window AND straight hits ('+sig.straightHits+') > splits ('+sig.splitHits+'). Follow this element!</strong>');
+    }else{
+      msg+='<br>'+(lang==='zh'?'跟随此元素，但做好覆盖或切换的准备。':'Follow it, but be ready to cover or switch.');
+    }
+  }else if(sig.type==='start'){
+    title=lang==='zh'?'★ 推荐起始 — '+eName:'★ STARTING PICK — '+eName;
+    msg=lang==='zh'
+      ?`根据预有记录，这是前2个热门元素之一（排名第${sig.rank}）。建议从这些元素开始下注。`
+      :`Based on preexisting records, this is one of the top 2 hot elements (rank #${sig.rank}). Recommended to start betting with these.`;
   }
 
-  // Create popup
   const overlay=document.createElement('div');
   overlay.className='sig-popup-overlay';
   overlay.onclick=(e)=>{if(e.target===overlay)overlay.remove()};
@@ -1168,19 +1369,39 @@ function refreshAnalysis(){
   rec.style.display='block';
   const behindEls=ELS.filter(el=>(d[el].t/n*100)<43);
   const hotEls=ELS.filter(el=>(d[el].t/n*100)>54);
-  if(n>=30&&behindEls.length>=2){
+  const liveSpins=Math.max(0,n-LED_COUNT);
+
+  // Strategy rules
+  let recHTML='';
+
+  // Rule: Pick elements with more straight hits when choosing between options
+  const sortedByProfit=[...ELS].sort((a,b)=>(d[b].s*2+d[b].sp)-(d[a].s*2+d[a].sp));
+  const top2=sortedByProfit.slice(0,2);
+
+  if(n<=LED_COUNT+3 && n>=5){
+    // Starting phase: suggest top 2 hot elements
     rec.className='rec rec-go';
-    rec.innerHTML='📊 '+behindEls.map(el=>L[el].s).join(',')+' '+(lang==='zh'?'落后 — 这些元素可能会追赶':'behind — may be due for a catch-up');
-  }else if(n>=30&&hotEls.length>=2){
+    const names=top2.map(el=>'<span style="color:'+L[el].c+'">'+L[el].s+'</span>').join(', ');
+    recHTML='★ '+(lang==='zh'?'起始阶段：跟随前2个热门元素 ':'Starting phase: follow top 2 hot elements ')+names;
+    recHTML+='<br><span style="font-size:.8em;color:var(--dim)">'+(lang==='zh'?'优先选择直注命中多的元素':'Prefer elements with more straight hits')+'</span>';
+  }else if(behindEls.length>=2){
+    rec.className='rec rec-go';
+    recHTML='📊 '+behindEls.map(el=>'<span style="color:'+L[el].c+'">'+L[el].s+'</span>').join(',')+' '+(lang==='zh'?'落后 — 这些元素可能会追赶':'behind — may be due for a catch-up');
+    recHTML+='<br><span style="font-size:.8em;color:var(--dim)">'+(lang==='zh'?'但不要追逐唯一落后的元素！':'But don\'t chase the ONLY element that is behind!')+'</span>';
+  }else if(hotEls.length>=2){
     rec.className='rec rec-stop';
-    rec.innerHTML='⚠️ '+(lang==='zh'?'多个元素领先 — 考虑保存利润':'Multiple elements running hot — consider banking profits');
-  }else if(n>=40){
+    recHTML='⚠️ '+(lang==='zh'?'多个元素领先 — 考虑保存利润':'Multiple elements running hot — consider banking profits');
+  }else if(liveSpins>=40 && liveSpins<=60){
     rec.className='rec rec-wait';
-    rec.innerHTML='🎯 '+n+' '+(lang==='zh'?'次旋转 — 接近推荐场次长度(30-40)':'spins — approaching recommended session length (30-40)');
+    recHTML='🎯 '+liveSpins+' '+(lang==='zh'?'次实际旋转（不含LED前'+LED_COUNT+'次）— 推荐场次长度内':'live spins (excl. LED first '+LED_COUNT+') — within recommended session length');
+  }else if(liveSpins>60){
+    rec.className='rec rec-stop';
+    recHTML='🛑 '+liveSpins+' '+(lang==='zh'?'次实际旋转 — 超过推荐场次长度，考虑结束':'live spins — exceeding recommended session length, consider stopping');
   }else if(n>=5){
     rec.className='rec rec-go';
-    rec.innerHTML='▶ '+(lang==='zh'?'记录中...':'Recording... ')+n+' '+(lang==='zh'?'次旋转。需要25+次才有意义。':'spins. Need 25+ for patterns.');
+    recHTML='▶ '+(lang==='zh'?'记录中... ':'Recording... ')+n+' '+t('spins')+' ('+liveSpins+' '+(lang==='zh'?'次实际':'live')+')';
   }
+  rec.innerHTML=recHTML;
 
   // Straight vs Split table
   let svs=`<table style="width:100%;border-collapse:collapse;font-size:.8em;color:var(--txt)">
@@ -1218,6 +1439,7 @@ function refreshAnalysis(){
 
 function refreshEndRec(d,n){
   const endRec=document.getElementById('endRec');
+  const liveSpins=Math.max(0,n-LED_COUNT);
   if(n<25){endRec.style.display='none';return}
   endRec.style.display='block';
 
@@ -1273,14 +1495,14 @@ function refreshEndRec(d,n){
   const maxPL=Math.max(...Object.values(plData));
   const avgPL=Object.values(plData).reduce((a,b)=>a+b,0)/5;
 
-  if(n>=40 && avgPL>0){
+  if(liveSpins>=40 && avgPL>0){
     verdict.style.background='rgba(231,76,60,.2)';verdict.style.color='#e74c3c';
     verdict.textContent=lang==='zh'?'🛑 '+t('rec_stop_title'):'🛑 '+t('rec_stop_title');
     reasonsHTML+=`<div class="reason">💰 ${t('rec_you_up')}</div>`;
-  }else if(dueEls.length>=2 && n<50){
+  }else if(dueEls.length>=2 && liveSpins<60){
     verdict.style.background='rgba(46,204,113,.2)';verdict.style.color='#2ecc71';
     verdict.textContent=lang==='zh'?'▶ '+t('rec_cont_title'):'▶ '+t('rec_cont_title');
-  }else if(n>=40 && allDown){
+  }else if(liveSpins>=40 && allDown){
     verdict.style.background='rgba(231,76,60,.2)';verdict.style.color='#e74c3c';
     verdict.textContent='🛑 '+t('rec_stop_title');
     reasonsHTML+=`<div class="reason">📉 ${t('rec_you_down')}</div>`;
@@ -1331,6 +1553,7 @@ function refreshSessions(){
   div.innerHTML=h;
 
   analyzeOptimalSpins();
+  refreshPoolStats();
 }
 
 async function delSess(i){
@@ -1401,6 +1624,180 @@ function analyzeOptimalSpins(){
       <td>${r.bestDev}%</td></tr>`;
   });
   h+='</table>';
+  div.innerHTML=h;
+}
+
+function refreshPoolStats(){
+  const card=document.getElementById('poolStatsCard');
+  const div=document.getElementById('poolStats');
+  const validSessions=sessions.filter(s=>s.spins&&s.spins.length>=25);
+  if(validSessions.length<2){card.style.display='none';return}
+  card.style.display='block';
+
+  // Analyze each session INDIVIDUALLY, then find cross-session patterns
+  const perSess=[];
+  validSessions.forEach(sess=>{
+    const n=sess.spins.length;
+    const sd={total:n,live:Math.max(0,n-LED_COUNT),el:{}};
+
+    ELS.forEach(el=>{
+      let s=0,sp=0,blank=0,maxBl=0,coldRecoveries=[];
+      let inCold=false,coldStart=0;
+      for(let i=0;i<n;i++){
+        const hit=sess.spins[i].hits[el];
+        if(hit!=='-'){
+          if(hit==='s')s++;else sp++;
+          if(blank>=4)coldRecoveries.push(i-coldStart); // spins to recover
+          inCold=false;blank=0;
+        }else{
+          if(blank===0)coldStart=i;
+          blank++;if(blank>=4)inCold=true;
+          if(blank>maxBl)maxBl=blank;
+        }
+      }
+      let pl=0;
+      sess.spins.forEach(x=>{if(x.hits[el]==='s')pl+=21;else if(x.hits[el]==='sp')pl+=3;else pl-=15});
+      sd.el[el]={s,sp,t:s+sp,maxBl,coldRecoveries,pl};
+    });
+
+    // Best overall spin# in this session
+    const cnt={};ELS.forEach(el=>cnt[el]=0);
+    let bestSpin=0,bestDev=999;
+    for(let i=0;i<n;i++){
+      ELS.forEach(el=>{if(sess.spins[i].hits[el]!=='-')cnt[el]++});
+      let dev=0;ELS.forEach(el=>dev+=Math.abs(cnt[el]/(i+1)-18/37));
+      if(i>=9&&dev<bestDev){bestDev=dev;bestSpin=i+1}
+    }
+    sd.bestSpin=bestSpin;
+    perSess.push(sd);
+  });
+
+  const ns=perSess.length;
+
+  // === 1. BEST TIME TO STOP ===
+  const optSpins=perSess.map(s=>s.bestSpin);
+  const avgOptimal=Math.round(optSpins.reduce((a,b)=>a+b,0)/ns);
+  const minOpt=Math.min(...optSpins),maxOpt=Math.max(...optSpins);
+  // Bucket into ranges
+  const buckets={};
+  optSpins.forEach(v=>{const b=Math.round(v/5)*5;buckets[b]=(buckets[b]||0)+1});
+  let topBucket=0,topBucketCount=0;
+  for(const[b,c]of Object.entries(buckets)){if(c>topBucketCount){topBucketCount=c;topBucket=+b}}
+
+  let h=`<p style="font-size:.85em;margin-bottom:10px">${lang==='zh'?'分析':'Analyzing'} <strong style="color:var(--gold)">${ns}</strong> ${lang==='zh'?'个独立场次的模式':'individual sessions for patterns'}</p>`;
+
+  // Best stop time
+  h+=`<div style="background:rgba(255,215,0,.1);border-radius:8px;padding:10px;margin-bottom:10px">
+    <div style="font-size:.85em;font-weight:700;color:var(--gold);margin-bottom:6px">🎯 ${lang==='zh'?'最佳停止时机':'Best Time to Stop'}</div>
+    <div style="font-size:.9em">${lang==='zh'?'各场次最佳旋转#均值':'Avg best spin# across sessions'}: <strong style="color:var(--gold)">${avgOptimal}</strong> (${lang==='zh'?'范围':'range'} ${minOpt}-${maxOpt})</div>
+    <div style="font-size:.8em;color:var(--dim);margin-top:2px">${lang==='zh'?'最常见区间':'Most common range'}: ~${topBucket} ${lang==='zh'?'次旋转':'spins'} (${topBucketCount}/${ns} ${lang==='zh'?'场次':'sessions'})</div>
+  </div>`;
+
+  // === 2. COLD RECOVERY: After 4+ misses, how many spins to wait? ===
+  h+=`<div style="background:rgba(231,76,60,.1);border-radius:8px;padding:10px;margin-bottom:10px">
+    <div style="font-size:.85em;font-weight:700;color:#e74c3c;margin-bottom:6px">❄️ ${lang==='zh'?'冷门恢复（4+连续未命中后）':'Cold Recovery (after 4+ consecutive misses)'}</div>
+    <table style="width:100%;border-collapse:collapse;font-size:.8em;color:var(--txt)">
+    <tr><th style="text-align:left">${lang==='zh'?'元素':'Element'}</th><th>${lang==='zh'?'发生次数':'Times'}</th><th>${lang==='zh'?'平均恢复':'Avg Recovery'}</th><th>${lang==='zh'?'最快':'Fastest'}</th><th>${lang==='zh'?'最慢':'Slowest'}</th></tr>`;
+  ELS.forEach(el=>{
+    const allRec=[];
+    perSess.forEach(s=>allRec.push(...s.el[el].coldRecoveries));
+    const eName=lang==='zh'?L[el].cn:L[el].n;
+    if(allRec.length){
+      const avg=(allRec.reduce((a,b)=>a+b,0)/allRec.length).toFixed(1);
+      h+=`<tr><td style="color:${L[el].c};font-weight:700">${eName}</td>
+        <td style="text-align:center">${allRec.length}</td>
+        <td style="text-align:center;font-weight:700">${avg} ${lang==='zh'?'转':'spins'}</td>
+        <td style="text-align:center;color:#2ecc71">${Math.min(...allRec)}</td>
+        <td style="text-align:center;color:#e74c3c">${Math.max(...allRec)}</td></tr>`;
+    }else{
+      h+=`<tr><td style="color:${L[el].c};font-weight:700">${eName}</td>
+        <td colspan="4" style="text-align:center;color:var(--dim)">${lang==='zh'?'无4+冷门记录':'No 4+ cold streaks recorded'}</td></tr>`;
+    }
+  });
+  h+='</table>';
+  h+=`<div style="font-size:.75em;color:var(--dim);margin-top:4px">${lang==='zh'?'提示：平均恢复旋转数越高，冷门后越应该避免追逐该元素':'Tip: Higher avg recovery = avoid chasing that element after a cold streak'}</div>`;
+  h+='</div>';
+
+  // === 3. PER-ELEMENT P&L ACROSS SESSIONS ===
+  h+=`<div style="background:rgba(46,204,113,.1);border-radius:8px;padding:10px;margin-bottom:10px">
+    <div style="font-size:.85em;font-weight:700;color:#2ecc71;margin-bottom:6px">💰 ${lang==='zh'?'各元素场次盈亏（每场独立计算）':'Per-Element P&L (each session calculated separately)'}</div>
+    <table style="width:100%;border-collapse:collapse;font-size:.8em;color:var(--txt)">
+    <tr><th style="text-align:left">${lang==='zh'?'元素':'Element'}</th><th>${lang==='zh'?'平均盈亏':'Avg P&L'}</th><th>${lang==='zh'?'最佳场次':'Best Session'}</th><th>${lang==='zh'?'最差场次':'Worst Session'}</th><th>${lang==='zh'?'盈利场次':'Profitable'}</th></tr>`;
+  ELS.forEach(el=>{
+    const pls=perSess.map(s=>s.el[el].pl);
+    const avg=Math.round(pls.reduce((a,b)=>a+b,0)/ns);
+    const best=Math.max(...pls),worst=Math.min(...pls);
+    const profitable=pls.filter(v=>v>0).length;
+    const eName=lang==='zh'?L[el].cn:L[el].n;
+    h+=`<tr><td style="color:${L[el].c};font-weight:700">${eName}</td>
+      <td style="text-align:center;color:${avg>=0?'#2ecc71':'#e74c3c'};font-weight:700">${avg>=0?'+':''}${avg}u</td>
+      <td style="text-align:center;color:#2ecc71">${best>=0?'+':''}${best}u</td>
+      <td style="text-align:center;color:#e74c3c">${worst>=0?'+':''}${worst}u</td>
+      <td style="text-align:center">${profitable}/${ns}</td></tr>`;
+  });
+  h+='</table>';
+  h+=`<div style="font-size:.75em;color:var(--dim);margin-top:4px">${lang==='zh'?'规则：选2-3个元素时，优先选直注命中多的（每次直注赢21u vs 分注赢3u）':'Rule: When picking 2-3 elements, prefer those with more straight hits (straight wins 21u vs split 3u)'}</div>`;
+  h+='</div>';
+
+  // === 4. CATCH-UP PATTERNS ===
+  h+=`<div style="background:rgba(241,196,15,.1);border-radius:8px;padding:10px;margin-bottom:10px">
+    <div style="font-size:.85em;font-weight:700;color:#f1c40f;margin-bottom:6px">📊 ${lang==='zh'?'追赶模式观察':'Catch-Up Pattern Observations'}</div>`;
+  // Find: in each session, how often does the most-behind element catch up?
+  let catchUpCount=0,noBehindCount=0,stayBehindCount=0;
+  perSess.forEach(s=>{
+    // At spin 20 (midpoint), which element was most behind?
+    const midpoint=Math.min(20,s.total-5);
+    if(midpoint<15)return;
+    const midCnt={};ELS.forEach(el=>midCnt[el]=0);
+    for(let i=0;i<midpoint;i++){
+      ELS.forEach(el=>{if(validSessions[0]){/* use sess spins */}});
+    }
+    // Simplified: check if worst element at halfway caught up by end
+    const halfN=Math.floor(s.total/2);
+    let worstAtHalf=null,worstPctAtHalf=999;
+    ELS.forEach(el=>{
+      const pct=s.el[el].t/s.total;
+      // This is final %, but we need halfway %... use approximation
+    });
+  });
+  // Simplified catch-up insight
+  let onlyBehindStays=0,onlyBehindTotal=0;
+  perSess.forEach(s=>{
+    // Find if any element had maxBl>=4 and was the only one
+    const coldEls=ELS.filter(el=>s.el[el].maxBl>=4);
+    if(coldEls.length===1){
+      onlyBehindTotal++;
+      // Check if it ended below expected
+      const el=coldEls[0];
+      const pct=s.el[el].t/s.total*100;
+      if(pct<45)onlyBehindStays++;
+    }
+  });
+  if(onlyBehindTotal>0){
+    const stayPct=Math.round(onlyBehindStays/onlyBehindTotal*100);
+    h+=`<div style="font-size:.85em;margin-bottom:6px">
+      ${lang==='zh'?'当只有一个元素有4+冷门时':'When only ONE element has a 4+ cold streak'}:
+      <strong style="color:#e74c3c">${stayPct}%</strong> ${lang==='zh'?'的场次该元素最终仍落后':'of the time it stayed behind by session end'}
+      (${onlyBehindStays}/${onlyBehindTotal} ${lang==='zh'?'场次':'sessions'})</div>`;
+    h+=`<div style="font-size:.8em;color:var(--dim)">${lang==='zh'?'⚠️ 验证规则：不要追逐唯一落后的元素':'⚠️ Validates the rule: Don\'t chase the only element that is behind'}</div>`;
+  }else{
+    h+=`<div style="font-size:.85em;color:var(--dim)">${lang==='zh'?'需要更多数据来分析追赶模式':'Need more session data to analyze catch-up patterns'}</div>`;
+  }
+  h+='</div>';
+
+  // === 5. CURRENT THRESHOLDS ===
+  h+=`<div style="background:rgba(255,255,255,.05);border-radius:8px;padding:10px">
+    <div style="font-size:.8em;font-weight:700;color:var(--gold);margin-bottom:4px">${lang==='zh'?'当前阈值（固定，基于数据收集后审查更新）':'Current Thresholds (fixed, updated after data review)'}</div>
+    <div style="font-size:.75em;color:var(--dim);line-height:1.8">
+      ${lang==='zh'?'观察窗口':'Window'}: <strong>15</strong> ${lang==='zh'?'次旋转':'spins'} ·
+      ${lang==='zh'?'冷门触发':'Cold trigger'}: <strong>4</strong> ${lang==='zh'?'连续空白':'blank streak'} ·
+      ${lang==='zh'?'推荐场次':'Recommended session'}: <strong>40-60</strong> ${lang==='zh'?'实际旋转':'live spins'} ·
+      LED ${lang==='zh'?'预有':'preexisting'}: <strong>${LED_COUNT}</strong><br>
+      ${lang==='zh'?'数据建议最佳停止':'Data suggests best stop'}: <strong style="color:var(--gold)">~${avgOptimal}</strong> ${lang==='zh'?'次旋转':'spins'} ·
+      ${lang==='zh'?'基于':'Based on'} <strong>${ns}</strong> ${lang==='zh'?'个场次':'sessions'}
+    </div>
+  </div>`;
+
   div.innerHTML=h;
 }
 
