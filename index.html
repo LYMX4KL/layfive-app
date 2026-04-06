@@ -187,7 +187,11 @@ button{font-family:inherit}
 .rt-cell.main-fill{box-shadow:inset 0 0 0 100px rgba(255,215,0,.45),0 0 0 2px var(--gold);z-index:1;opacity:1}
 .rt-cell.main-split-fill{box-shadow:inset 0 0 0 100px rgba(255,140,0,.45),0 0 0 2px #ff8c00;z-index:1;opacity:1}
 .rt-cell.dim{opacity:.25}
-.rt-cell .rt-chip{position:absolute;width:14px;height:14px;border-radius:50%;border:1px solid rgba(255,255,255,.45);box-shadow:0 1px 3px rgba(0,0,0,.7);top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:2}
+.rt-cell{overflow:visible}
+.rt-cell .rt-chip{position:absolute;width:10px;height:10px;border-radius:50%;border:1px solid rgba(255,255,255,.55);box-shadow:0 1px 3px rgba(0,0,0,.8);bottom:1px;right:1px;pointer-events:none;z-index:3}
+/* Split chips: positioned ON the shared edge between two cells (overflow into gap) */
+.rt-cell .rt-chip.split-h{top:50%;left:auto;right:-7px;bottom:auto;transform:translateY(-50%);width:13px;height:13px}
+.rt-cell .rt-chip.split-v{top:auto;bottom:-7px;left:50%;right:auto;transform:translateX(-50%);width:13px;height:13px}
 .rt-chip.main{background:radial-gradient(circle at 35% 35%,#ffe066,#b8860b)}
 .rt-chip.cover{background:radial-gradient(circle at 35% 35%,#ff8c5a,#c0392b)}
 .cover-legend{display:flex;gap:12px;justify-content:center;margin:10px 0;font-size:.8em;color:var(--dim)}
@@ -2306,6 +2310,12 @@ function prPlaceElementBet(name){
   const cost=15*u;
   if(prState.balance<cost){alert('Insufficient balance for '+name+' ($'+cost+')');return}
   const betId='element-'+name;
+  // Sync strategy bar so the MAIN dropdown reflects this element — fixes
+  // the "Pick a main element first" prompt when user uses the element bar
+  // and then the strategy bar afterwards.
+  prState.strategyMain=name;
+  const ms=document.getElementById('prStrategyMain');
+  if(ms&&ms.value!==name)ms.value=name;
   // Remove any other element bets (different name) — clicking a new element replaces, not stacks
   for(let i=prState.bets.length-1;i>=0;i--){
     const b=prState.bets[i];
@@ -2604,6 +2614,15 @@ function prApplyStrategyHighlight(){
 
 // Place actual chips for the strategy: full main element bet + full cover bet (only on numbers not in main)
 function prApplyStrategyBets(){
+  // Fallback: if no dropdown selection, use any active element bet as the main
+  if(!prState.strategyMain){
+    const elBet=prState.bets.find(b=>b.type==='element');
+    if(elBet){
+      prState.strategyMain=elBet.name;
+      const ms=document.getElementById('prStrategyMain');
+      if(ms)ms.value=elBet.name;
+    }
+  }
   const main=prState.strategyMain;
   const cover=prState.strategyCover;
   if(!main){alert('Pick a main element first');return}
@@ -2772,7 +2791,7 @@ function selectMainEl(el){
 
 function applyMainHighlight(el){
   // Main element: chip only, no color highlight (players know main numbers).
-  // Straight numbers — chip only
+  // Straight numbers — small chip in corner so the number stays visible
   L[el].st.forEach(n=>{
     const c=document.getElementById('rt_'+n);
     if(c){
@@ -2780,23 +2799,56 @@ function applyMainHighlight(el){
       addRtChip(c,'main');
     }
   });
-  // Split pair numbers — chip only
+  // Split pairs — single chip on the shared edge between the two cells
   L[el].sp.forEach(([a,b])=>{
-    [a,b].forEach(n=>{
-      const c=document.getElementById('rt_'+n);
-      if(c){
-        c.classList.remove('dim');
-        addRtChip(c,'main');
-      }
-    });
+    const cA=document.getElementById('rt_'+a);
+    const cB=document.getElementById('rt_'+b);
+    if(cA)cA.classList.remove('dim');
+    if(cB)cB.classList.remove('dim');
+    addRtSplitChip(a,b,'main');
   });
 }
 
 function addRtChip(cell,kind){
-  // Avoid duplicates
-  if(cell.querySelector('.rt-chip.'+kind))return;
+  // Avoid duplicates (only add one corner chip per kind per cell)
+  if(cell.querySelector('.rt-chip.'+kind+':not(.split-h):not(.split-v)'))return;
   const chip=document.createElement('div');
   chip.className='rt-chip '+kind;
+  cell.appendChild(chip);
+}
+
+// Place a single chip on the shared edge between two adjacent cells (split bet).
+function addRtSplitChip(a,b,kind){
+  const aPos=TABLE_LAYOUT.find(([n])=>n===a);
+  const bPos=TABLE_LAYOUT.find(([n])=>n===b);
+  if(!aPos||!bPos){
+    // 0/x splits (zero is in its own column, spans rows): just put a chip on the number cell
+    const fallback=document.getElementById('rt_'+(aPos?a:b));
+    if(fallback)addRtChip(fallback,kind);
+    return;
+  }
+  const [,colA,rowA]=aPos;
+  const [,colB,rowB]=bPos;
+  let anchorN, orientation;
+  if(rowA===rowB){
+    // Same row → adjacent columns → horizontal split, chip on right edge of the lower-col cell
+    anchorN = colA<colB ? a : b;
+    orientation='h';
+  }else if(colA===colB){
+    // Same column → adjacent rows → vertical split, chip on bottom edge of the lower-row cell
+    anchorN = rowA<rowB ? a : b;
+    orientation='v';
+  }else{
+    // Diagonal/non-adjacent — shouldn't happen for valid splits, fall back to corner chip
+    addRtChip(document.getElementById('rt_'+a),kind);
+    return;
+  }
+  const cell=document.getElementById('rt_'+anchorN);
+  if(!cell)return;
+  // Avoid duplicate split chips of same kind+orientation on same anchor
+  if(cell.querySelector('.rt-chip.split-'+orientation+'.'+kind))return;
+  const chip=document.createElement('div');
+  chip.className='rt-chip split-'+orientation+' '+kind;
   cell.appendChild(chip);
 }
 
@@ -2913,16 +2965,19 @@ function updateCoverDisplay(){
     if(c){c.classList.remove('dim','main-fill','main-split-fill');c.classList.add('highlight');addRtChip(c,'cover')}
   });
 
-  // Highlight extra splits (orange) — skip numbers already covered by main
+  // Highlight extra splits (orange) — skip numbers already covered by main.
+  // Place a SINGLE chip on the shared edge between the two cells, not on each cell.
   extraSplitPairs.forEach(([a,b])=>{
     if(!mainNums.has(a)){
       const cA=document.getElementById('rt_'+a);
-      if(cA){cA.classList.remove('dim','main-fill','main-split-fill');cA.classList.add('split-highlight');addRtChip(cA,'cover')}
+      if(cA){cA.classList.remove('dim','main-fill','main-split-fill');cA.classList.add('split-highlight')}
     }
     if(!mainNums.has(b)){
       const cB=document.getElementById('rt_'+b);
-      if(cB){cB.classList.remove('dim','main-fill','main-split-fill');cB.classList.add('split-highlight');addRtChip(cB,'cover')}
+      if(cB){cB.classList.remove('dim','main-fill','main-split-fill');cB.classList.add('split-highlight')}
     }
+    // One split chip per pair, on the boundary
+    addRtSplitChip(a,b,'cover');
   });
 
   // Show extra split pairs below table
