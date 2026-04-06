@@ -287,6 +287,41 @@ button{font-family:inherit}
 .pr-hist-num.h-black{background:#222}
 .pr-hist-num.h-green{background:#0b5f38;border-color:#d4af37}
 @media(orientation:portrait){.pr-wrap{height:calc(100vh - 100px)}.pr-main{flex-direction:column}.pr-controls-area{width:100%;flex-direction:row;flex-wrap:wrap}.pr-chip-selector,.pr-action-buttons{flex:1}.pr-spin-button{flex:1 1 100%}}
+/* Landscape (phone rotated sideways) — fit Practice tab on screen */
+@media(orientation:landscape) and (max-height:520px){
+  .top{padding:2px 6px;min-height:0}
+  .top h1{font-size:.95em}
+  .tabs{position:static;top:auto}
+  .tab{padding:4px 2px;font-size:.7em}
+  #p5 .pr-wrap{height:calc(100vh - 60px);padding:2px;min-height:0}
+  .pr-header{padding:2px 6px}
+  .pr-title{font-size:11px}
+  .pr-balance{font-size:10px;padding:2px 5px}
+  .pr-wheel-toggle{font-size:9px;padding:3px 6px}
+  .pr-main{padding:2px;flex-direction:row}
+  .pr-roulette-container{gap:4px}
+  .pr-element-bar{height:22px}
+  .pr-element-btn{font-size:9px;padding:0 2px}
+  .pr-element-btn .el-cost{font-size:7px}
+  .pr-controls-area{width:84px;gap:2px}
+  .pr-chip-selector,.pr-action-buttons{padding:2px}
+  .pr-chip-selector-label{font-size:8px;margin-bottom:2px}
+  .pr-chip-btn{font-size:9px;padding:2px}
+  .pr-action-btn{font-size:9px;padding:3px 2px}
+  .pr-spin-button{padding:5px;font-size:11px}
+  .pr-history-bar{display:none}
+  .pr-strategy-bar{font-size:9px;padding:2px;gap:2px}
+  .pr-strategy-bar .pr-st-label{font-size:8px}
+  .pr-strategy-bar select{font-size:9px;padding:1px 2px}
+  .pr-units-btn{font-size:9px;padding:2px 4px}
+  .pr-strategy-bar button.pr-apply-btn{font-size:9px;padding:2px 6px}
+  .pr-signals-bar{gap:2px;margin-top:1px}
+  .pr-signal-badge{font-size:8px;padding:2px 1px}
+  .pr-signal-badge .badge-el{font-size:7px}
+  .pr-signal-badge .badge-sym{font-size:9px}
+  .pr-stats-area{font-size:8px;padding:2px}
+  .pr-stat-line{margin:1px 0}
+}
 
 /* === RESPONSIVE === */
 @media(min-width:700px){body{max-width:700px;margin:0 auto}}
@@ -2736,22 +2771,21 @@ function selectMainEl(el){
 }
 
 function applyMainHighlight(el){
-  // Straight numbers — gold fill + chip
+  // Main element: chip only, no color highlight (players know main numbers).
+  // Straight numbers — chip only
   L[el].st.forEach(n=>{
     const c=document.getElementById('rt_'+n);
     if(c){
       c.classList.remove('dim');
-      c.classList.add('main-fill');
       addRtChip(c,'main');
     }
   });
-  // Split pair numbers — orange-gold fill + chip
+  // Split pair numbers — chip only
   L[el].sp.forEach(([a,b])=>{
     [a,b].forEach(n=>{
       const c=document.getElementById('rt_'+n);
       if(c){
         c.classList.remove('dim');
-        c.classList.add('main-split-fill');
         addRtChip(c,'main');
       }
     });
