@@ -488,7 +488,7 @@ button{font-family:inherit}
     <div class="cover-elements" id="coverMainEls"></div>
 
     <!-- Step 2: Cover element with hot/behind tags -->
-    <div class="cover-step-label" id="coverStep2Label" style="display:none" data-i18n="cover_step2">STEP 2: Choose Covering Element</div>
+    <div class="cover-step-label" id="coverStep2Label" style="display:none" data-i18n="cover_step2">STEP 2 (OPTIONAL): Add a Covering Element — only when hedging</div>
     <div class="cover-elements" id="coverSubEls" style="display:none"></div>
 
     <!-- Step 3: Type buttons -->
@@ -713,7 +713,7 @@ const T = {
   tab_profile: {en:'Profile', zh:'个人资料'},
   tab_practice: {en:'Practice', zh:'练习'},
   cover_step1: {en:'STEP 1: Your Main Element (chasing)', zh:'第1步：主元素（追逐中）'},
-  cover_step2: {en:'STEP 2: Choose Covering Element', zh:'第2步：选择覆盖元素'},
+  cover_step2: {en:'STEP 2 (OPTIONAL): Add a Covering Element — only when hedging', zh:'第2步（可选）：添加覆盖元素 — 仅在需要对冲时'},
   cover_full: {en:'Full Set', zh:'全套'},
   cover_straight: {en:'Straight Only', zh:'仅直注'},
   cover_split: {en:'Split Only', zh:'仅分注'},
@@ -721,7 +721,7 @@ const T = {
   cover_extra_spl: {en:'Extra Split', zh:'额外分注'},
   cover_already: {en:'Already covered', zh:'已覆盖'},
   cover_select: {en:'Select your main element above to start', zh:'请先选择上方主元素'},
-  cover_pick_cover: {en:'Now pick a covering element', zh:'现在选择覆盖元素'},
+  cover_pick_cover: {en:'Main bets ready. Covering is optional — only pick a covering element if you want to hedge.', zh:'主元素已就绪。覆盖为可选 — 仅当需要对冲时才选择覆盖元素。'},
   cover_extra: {en:'extra numbers to place', zh:'个额外号码需下注'},
   cover_extra_units: {en:'extra units needed', zh:'个额外注数'},
   cover_split_lbl: {en:'Extra split bets to place:', zh:'额外分注需下注：'},
@@ -2552,16 +2552,22 @@ function prInitializeStrategyBar(){
   const opts=Object.keys(PR_ELEMENTS);
   mainSel.innerHTML='<option value="">--</option>'+opts.map(n=>'<option value="'+n+'">'+n+'</option>').join('');
   covSel.innerHTML='<option value="">--</option>'+opts.map(n=>'<option value="'+n+'">'+n+'</option>').join('');
-  mainSel.addEventListener('change',()=>{
+  // Use both 'change' and 'input' events for cross-browser reliability
+  // (iOS Safari sometimes only fires one of them on <select>)
+  const onMainChange=()=>{
     prState.strategyMain=mainSel.value;
     prApplyStrategyHighlight();
-    if(prState.strategyMain)prApplyStrategyBets();
-  });
-  covSel.addEventListener('change',()=>{
+    if(prState.strategyMain)prApplyStrategyBets(); // cover is optional
+  };
+  mainSel.addEventListener('change',onMainChange);
+  mainSel.addEventListener('input',onMainChange);
+  const onCovChange=()=>{
     prState.strategyCover=covSel.value;
     prApplyStrategyHighlight();
     if(prState.strategyMain)prApplyStrategyBets();
-  });
+  };
+  covSel.addEventListener('change',onCovChange);
+  covSel.addEventListener('input',onCovChange);
   // Units buttons 1u-5u
   const ug=document.getElementById('prUnitsGroup');
   ug.innerHTML='';
@@ -2614,16 +2620,22 @@ function prApplyStrategyHighlight(){
 
 // Place actual chips for the strategy: full main element bet + full cover bet (only on numbers not in main)
 function prApplyStrategyBets(){
-  // Fallback: if no dropdown selection, use any active element bet as the main
+  // Belt-and-braces: read straight from the DOM in case the change event
+  // never fired (iOS Safari) or the user is hitting APPLY directly.
+  const ms=document.getElementById('prStrategyMain');
+  const cs=document.getElementById('prStrategyCover');
+  if(ms&&ms.value&&!prState.strategyMain)prState.strategyMain=ms.value;
+  if(cs&&cs.value&&!prState.strategyCover)prState.strategyCover=cs.value;
+  // Fallback: if still nothing, use any active element bet as the main
   if(!prState.strategyMain){
     const elBet=prState.bets.find(b=>b.type==='element');
     if(elBet){
       prState.strategyMain=elBet.name;
-      const ms=document.getElementById('prStrategyMain');
       if(ms)ms.value=elBet.name;
     }
   }
   const main=prState.strategyMain;
+  // Cover is OPTIONAL — the rare hedge, never required
   const cover=prState.strategyCover;
   if(!main){alert('Pick a main element first');return}
   const u=prState.selectedChip*prState.strategyUnits;
