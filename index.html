@@ -451,8 +451,10 @@ button{font-family:inherit}
     <button class="btn-undo" onclick="undo()" data-i18n="btn_undo">↩ Undo</button>
     <button class="btn-new" onclick="newSess()" data-i18n="btn_new">New</button>
     <button class="btn-save" onclick="saveSess()" data-i18n="btn_save">Save Session</button>
+    <button class="btn-restart" onclick="restartSess()" data-i18n="btn_restart" style="background:linear-gradient(135deg,#ff8c00,#cc4400);color:#fff;border:1px solid #ffae42;border-radius:6px;padding:6px 10px;font-weight:700;cursor:pointer">⟳ Restart</button>
   </div>
   <div class="spin-count" id="spinCount">0 spins</div>
+  <div id="restartWarn" style="display:none;margin:6px 0;padding:8px 10px;background:rgba(255,140,0,.18);border:1px solid #ff8c00;border-radius:6px;color:#ffb347;font-size:.85em;text-align:center" data-i18n="restart_warn">⚠ Approaching 60 spins — consider Restart to refresh the pattern.</div>
   <!-- Scorecard -->
   <div class="sc-wrap">
     <table class="sc"><thead><tr>
@@ -734,6 +736,11 @@ const T = {
   btn_undo: {en:'↩ Undo', zh:'↩ 撤销'},
   btn_new: {en:'New', zh:'新场'},
   btn_save: {en:'Save Session', zh:'保存场次'},
+  btn_restart: {en:'⟳ Restart', zh:'⟳ 重启'},
+  restart_warn: {en:'⚠ Approaching 60 spins — consider Restart to refresh the pattern.', zh:'⚠ 接近60次旋转 — 考虑重启以刷新模式。'},
+  restart_confirm: {en:'Restart session? Current spins will be archived to Sessions tab, and a new session will start with the last 12 spins.', zh:'重启场次？当前旋转将归档到场次标签页，新场次将以最后12次旋转开始。'},
+  restart_done: {en:'Session restarted. Last 12 spins are now the start of your new session.', zh:'场次已重启。最后12次旋转现在是新场次的开始。'},
+  restart_need12: {en:'Need at least 12 spins before you can restart.', zh:'需要至少12次旋转才能重启。'},
   most_behind: {en:'MOST BEHIND ELEMENT', zh:'最落后元素'},
   straight: {en:'Straight', zh:'直注'},
   split: {en:'Split', zh:'分注'},
@@ -1075,6 +1082,51 @@ function newSess(){
   spins=[];refreshAll();
 }
 
+// Restart current session: archive existing spins to Sessions tab,
+// then start a fresh session seeded with the last 12 spins.
+async function restartSess(){
+  if(spins.length<12){alert(t('restart_need12'));return}
+  if(!confirm(t('restart_confirm')))return;
+
+  // 1) Archive current session (only if it has enough spins to be meaningful)
+  if(spins.length>=25){
+    try{await saveSessSilent('restart');}catch(e){console.error('Restart archive error',e)}
+  }
+
+  // 2) Seed new session with last 12 spins
+  const tail=spins.slice(-12).map(x=>JSON.parse(JSON.stringify(x)));
+  spins=tail;
+  refreshAll();
+  alert(t('restart_done'));
+}
+
+// Save current session without alert/validation prompts; tag with reason.
+async function saveSessSilent(reason){
+  const sess={
+    date:document.getElementById('iDate').value||new Date().toISOString().slice(0,10),
+    casino:document.getElementById('iCasino').value||'-',
+    total:spins.length,
+    spins:JSON.parse(JSON.stringify(spins)),
+    elements:{},
+    ts:Date.now(),
+    reason:reason||'manual'
+  };
+  ELS.forEach(el=>{
+    const s=spins.filter(x=>x.hits[el]==='s').length;
+    const sp=spins.filter(x=>x.hits[el]==='sp').length;
+    sess.elements[el]={s,sp,t:s+sp};
+  });
+  if(firebaseReady && currentUser){
+    await db.collection('users').doc(currentUser.uid).collection('sessions').add(sess);
+    await loadSessions();
+    try{await updatePoolData();}catch(e){}
+  }else{
+    sessions.push(sess);
+    try{localStorage.setItem('lf_sess',JSON.stringify(sessions))}catch(e){}
+    refreshSessions();
+  }
+}
+
 async function saveSess(){
   if(!spins.length){alert(t('no_spins'));return}
   if(spins.length<25){alert(t('min_spins_warn')+ ' ('+spins.length+'/25)');return}
@@ -1269,6 +1321,9 @@ function refreshAll(){refreshScorecard();refreshAnalysis();refreshBehindBanner()
 
 function refreshScorecard(){
   document.getElementById('spinCount').textContent=spins.length+' '+t('spins');
+  // Show restart warning starting at spin 55
+  const warnEl=document.getElementById('restartWarn');
+  if(warnEl){warnEl.style.display=(spins.length>=55)?'block':'none';}
 
   const totalRows=spins.length+EMPTY_ROWS;
   const tb=document.getElementById('scBody');
@@ -2217,51 +2272,67 @@ function prPlaceBet(type,target,e,cellId){
 
 function prRenderChips(){
   document.querySelectorAll('.pr-chip').forEach(c=>c.remove());
+  // Helper that places a single chip on a cell at the given offset
+  const placeChip=(cellElement,amount,top,left)=>{
+    if(!cellElement)return;
+    const chip=prCreateChip(amount);
+    chip.style.position='absolute';
+    chip.style.top=top;chip.style.left=left;
+    chip.style.transform='translate(-50%,-50%)';
+    chip.style.zIndex='10';
+    cellElement.appendChild(chip);
+  };
+  // Helper that figures out where to put a split chip (on the line between two numbers)
+  const placeSplitChip=(a,b,amount)=>{
+    let cell=null,top='50%',left='50%';
+    if(a===0){
+      cell=document.getElementById('pr-cell-0');left='100%';
+      if(b===1)top='83%';else if(b===2)top='50%';else if(b===3)top='17%';
+    }else{
+      const lo=Math.min(a,b),hi=Math.max(a,b);
+      cell=document.getElementById('pr-cell-'+lo);
+      if(hi===lo+1){top='0%';left='50%'}        // horizontal neighbour (vertical line)
+      else if(hi===lo+3){top='50%';left='100%'} // vertical neighbour (horizontal line)
+    }
+    placeChip(cell,amount,top,left);
+  };
   prState.bets.forEach(bet=>{
-    let cellElement=null,left='50%',top='50%';
     if(bet.type==='straight'){
-      cellElement=document.getElementById('pr-cell-'+bet.target);
+      placeChip(document.getElementById('pr-cell-'+bet.target),bet.amount,'50%','50%');
     }else if(bet.type==='dozen'||bet.type==='column'||bet.type==='outside'){
-      cellElement=document.getElementById('pr-cell-'+bet.cellId);
+      placeChip(document.getElementById('pr-cell-'+bet.cellId),bet.amount,'50%','50%');
     }else if(bet.type==='split'){
-      const [a,b]=bet.target;
-      if(a===0){
-        cellElement=document.getElementById('pr-cell-0');left='100%';
-        if(b===1)top='83%';else if(b===2)top='50%';else if(b===3)top='17%';
-      }else{
-        cellElement=document.getElementById('pr-cell-'+a);
-        if(b===a+1){top='0%';left='50%'}
-        else if(b===a+3){top='50%';left='100%'}
-      }
+      placeSplitChip(bet.target[0],bet.target[1],bet.amount);
     }else if(bet.type==='street'){
+      let cell=null,top='50%',left='50%';
       if(bet.target[0]===0){
-        cellElement=document.getElementById('pr-cell-0');
+        cell=document.getElementById('pr-cell-0');
         left='100%';top=bet.target.includes(1)?'67%':'33%';
       }else{
-        cellElement=document.getElementById('pr-cell-'+bet.target[0]);
+        cell=document.getElementById('pr-cell-'+bet.target[0]);
         top='100%';left='50%';
       }
+      placeChip(cell,bet.amount,top,left);
     }else if(bet.type==='corner'){
+      let cell=null,top='0%',left='100%';
       if(bet.target[0]===0){
-        cellElement=document.getElementById('pr-cell-2');top='50%';left='0%';
+        cell=document.getElementById('pr-cell-2');top='50%';left='0%';
       }else{
-        cellElement=document.getElementById('pr-cell-'+bet.target[0]);
-        top='0%';left='100%';
+        cell=document.getElementById('pr-cell-'+bet.target[0]);
       }
+      placeChip(cell,bet.amount,top,left);
     }else if(bet.type==='sixline'){
-      cellElement=document.getElementById('pr-cell-'+bet.target[0]);
-      top='100%';left='100%';
+      placeChip(document.getElementById('pr-cell-'+bet.target[0]),bet.amount,'100%','100%');
     }else if(bet.type==='element'){
-      cellElement=document.getElementById('pr-elBtn-'+PR_ELEMENTS[bet.name].key);
-      top='50%';left='50%';
-    }
-    if(cellElement){
-      const chip=prCreateChip(bet.amount);
-      chip.style.position='absolute';
-      chip.style.top=top;chip.style.left=left;
-      chip.style.transform='translate(-50%,-50%)';
-      chip.style.zIndex='10';
-      cellElement.appendChild(chip);
+      // Element bets place a chip on each of the 12 straights AND each of the 3 splits.
+      // The per-cell amount is the chipUnit (one unit), since 15 units = 12 straights + 3 splits.
+      const perChip=bet.chipUnit||Math.max(1,Math.round(bet.amount/15));
+      (bet.target&&bet.target.straights||[]).forEach(n=>{
+        placeChip(document.getElementById('pr-cell-'+n),perChip,'50%','50%');
+      });
+      (bet.target&&bet.target.splits||[]).forEach(([a,b])=>{
+        placeSplitChip(a,b,perChip);
+      });
     }
   });
   prUpdateCoverageHighlight();
