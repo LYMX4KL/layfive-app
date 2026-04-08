@@ -3208,5 +3208,14 @@ function updateCoverDisplay(){
     ' · <span style="color:var(--gold);font-weight:700">'+extraUnits+'</span> '+t('cover_extra_units');
 }
 </script>
+
+<!-- LayFive Supabase integration (opt-in via ?supabase=1) -->
+<script>
+  if (new URLSearchParams(location.search).get('supabase') === '1') {
+    var __lfs = document.createElement('script');
+    __lfs.src = './layfive-supabase.js';
+    document.body.appendChild(__lfs);
+  }
+</script>
 </body>
 </html>
