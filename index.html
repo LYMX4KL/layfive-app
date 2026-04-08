@@ -3209,13 +3209,13 @@ function updateCoverDisplay(){
 }
 </script>
 
-<!-- LayFive Supabase integration (opt-in via ?supabase=1) -->
+<!-- LayFive Supabase integration (always on, consent popup handles opt-in) -->
 <script>
-  if (new URLSearchParams(location.search).get('supabase') === '1') {
+  (function(){
     var __lfs = document.createElement('script');
     __lfs.src = './layfive-supabase.js';
     document.body.appendChild(__lfs);
-  }
+  })();
 </script>
 </body>
 </html>
