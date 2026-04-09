@@ -102,7 +102,10 @@ button{font-family:inherit}
 .sc td{padding:2px;text-align:center;border:1px solid #ddd;height:30px;font-size:1em;color:#222;background:#fff}
 .sc .rn{width:24px;background:#f5f5f5;color:#aaa;font-size:.75em}
 .sc .sn{width:32px;background:#ffe;font-weight:700;font-size:1em}
-.sc .el{width:32px}
+.sc .el{width:32px;font-size:.9em;line-height:1}
+.sc .el .el-ic{display:block;font-size:.9em;line-height:1}
+.sc .el .el-nm{display:block;font-size:.72em;line-height:1;margin-top:1px}
+.sc .el .el-zh{font-size:1em}
 .sc .rl td{border-bottom:2.5px solid #c00}
 .sc .cM{background:#f0f0f0}.sc .cW{background:#eaf5ea}.sc .cWa{background:#e6f0fb}.sc .cF{background:#fce8e4}.sc .cE{background:#fdf6e0}
 .hM{background:#ddd!important;color:#555!important}.hW{background:#d5ecd5!important;color:#1a6a1a!important}
@@ -473,7 +476,7 @@ button{font-family:inherit}
   <div class="sc-wrap">
     <table class="sc"><thead><tr>
       <th class="rn">#</th><th class="sn">Drop</th>
-      <th class="hM el">金</th><th class="hW el">木</th><th class="hWa el">水</th><th class="hF el">火</th><th class="hE el">土</th>
+      <th class="hM el" data-i18n="hdr_metal">● Metal</th><th class="hW el" data-i18n="hdr_wood">▮ Wood</th><th class="hWa el" data-i18n="hdr_water">~ Water</th><th class="hF el" data-i18n="hdr_fire">▲ Fire</th><th class="hE el" data-i18n="hdr_earth">■ Earth</th>
     </tr></thead><tbody id="scBody"></tbody></table>
   </div>
   <!-- Most Behind Element Banner -->
@@ -764,6 +767,11 @@ const T = {
   restart_confirm: {en:'Restart session? Current spins will be archived to Sessions tab, and a new session will start with the last 12 spins.', zh:'重启场次？当前旋转将归档到场次标签页，新场次将以最后12次旋转开始。'},
   restart_done: {en:'Session restarted. Last 12 spins are now the start of your new session.', zh:'场次已重启。最后12次旋转现在是新场次的开始。'},
   restart_need12: {en:'Need at least 12 spins before you can restart.', zh:'需要至少12次旋转才能重启。'},
+  hdr_metal: {en:'<span class="el-ic">●</span><span class="el-nm">Metal</span>', zh:'<span class="el-zh">●金</span>'},
+  hdr_wood:  {en:'<span class="el-ic">▮</span><span class="el-nm">Wood</span>',  zh:'<span class="el-zh">▮木</span>'},
+  hdr_water: {en:'<span class="el-ic">~</span><span class="el-nm">Water</span>', zh:'<span class="el-zh">~水</span>'},
+  hdr_fire:  {en:'<span class="el-ic">▲</span><span class="el-nm">Fire</span>',  zh:'<span class="el-zh">▲火</span>'},
+  hdr_earth: {en:'<span class="el-ic">■</span><span class="el-nm">Earth</span>', zh:'<span class="el-zh">■土</span>'},
   most_behind: {en:'MOST BEHIND ELEMENT', zh:'最落后元素'},
   straight: {en:'Straight', zh:'直注'},
   split: {en:'Split', zh:'分注'},
