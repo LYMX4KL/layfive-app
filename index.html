@@ -25,7 +25,7 @@
 <style>
 :root{--m:#999;--w:#2a8a2a;--wa:#1a70c4;--f:#d03000;--e:#c49000;--bg:#1a1a2e;--card:#16213e;--acc:#0f3460;--txt:#e4e4e4;--gold:#ffd700;--dim:#888}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--txt);font-size:16px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--txt);font-size:16px;max-width:480px;margin:0 auto}
 button{font-family:inherit}
 
 /* === SCREENS === */
@@ -64,8 +64,8 @@ button{font-family:inherit}
 .profile-btn{background:none;border:none;color:var(--dim);font-size:1.2em;cursor:pointer;padding:3px 6px}
 
 /* === TABS === */
-.tabs{display:flex;background:#111;border-bottom:2px solid var(--gold);position:sticky;top:45px;z-index:99}
-.tab{flex:1;padding:10px 4px;text-align:center;font-size:.85em;font-weight:600;color:var(--dim);background:transparent;border:none;cursor:pointer}
+.tabs{display:flex;flex-wrap:wrap;background:#111;border-bottom:2px solid var(--gold);position:sticky;top:45px;z-index:99}
+.tab{flex:0 0 25%;padding:10px 4px;text-align:center;font-size:.85em;font-weight:600;color:var(--dim);background:transparent;border:none;cursor:pointer;box-sizing:border-box}
 .tab.on{color:var(--gold);border-bottom:2px solid var(--gold);margin-bottom:-2px}
 .pane{display:none}.pane.on{display:block}
 
@@ -304,7 +304,7 @@ button{font-family:inherit}
   .top{padding:2px 6px;min-height:0}
   .top h1{font-size:.95em}
   .tabs{position:static;top:auto}
-  .tab{padding:4px 2px;font-size:.7em}
+  .tab{flex:0 0 25%;padding:4px 2px;font-size:.7em}
   #p5 .pr-wrap{height:calc(100vh - 60px);padding:2px;min-height:0}
   .pr-header{padding:2px 6px}
   .pr-title{font-size:11px}
