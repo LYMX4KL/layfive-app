@@ -17,6 +17,11 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
+<!-- Chart.js, jsPDF, SheetJS -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/2.8.0/xlsx.min.js"></script>
+
 <style>
 :root{--m:#999;--w:#2a8a2a;--wa:#1a70c4;--f:#d03000;--e:#c49000;--bg:#1a1a2e;--card:#16213e;--acc:#0f3460;--txt:#e4e4e4;--gold:#ffd700;--dim:#888}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -330,6 +335,54 @@ button{font-family:inherit}
   .pr-stat-line{margin:1px 0}
 }
 
+/* === W/L LOG TAB === */
+.wl-wrap{padding:10px;display:flex;flex-direction:column;gap:15px}
+.wl-form-card{background:var(--card);border-radius:10px;padding:15px;border:1px solid #333}
+.wl-form-card h3{color:var(--gold);margin-bottom:10px}
+.form-group{margin-bottom:12px}
+.form-group label{display:block;font-size:.85em;color:var(--dim);margin-bottom:4px}
+.form-group input,.form-group select{width:100%;padding:8px;border-radius:6px;border:1px solid #444;background:#222;color:#fff;font-size:.95em}
+.toggle-btns{display:flex;gap:6px}
+.toggle-btn{flex:1;padding:8px;border:2px solid #444;border-radius:6px;background:#222;color:var(--txt);font-weight:600;cursor:pointer;transition:all .2s}
+.toggle-btn.active{border-color:var(--gold);background:rgba(255,215,0,.1);color:var(--gold)}
+.amount-toggle{cursor:pointer}
+.wl-history{background:var(--card);border-radius:10px;padding:15px;border:1px solid #333}
+.wl-history h3{color:var(--gold);margin-bottom:10px}
+.wl-entry{background:rgba(255,255,255,.03);border-radius:8px;padding:10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;border-left:4px solid var(--gold)}
+.wl-entry-info{flex:1}
+.wl-entry-date{font-size:.75em;color:var(--dim);margin-bottom:2px}
+.wl-entry-casino{font-weight:700;color:var(--txt)}
+.wl-entry-game{font-size:.85em;color:var(--dim);margin-top:2px}
+.wl-entry-amount{font-weight:700;font-size:1.1em;text-align:right}
+.wl-entry-delete{background:#c44;color:#fff;border:none;border-radius:4px;padding:4px 8px;font-size:.8em;cursor:pointer;margin-left:8px}
+.wl-badge{display:inline-block;font-size:.65em;padding:2px 6px;border-radius:3px;margin-right:4px;font-weight:700;background:rgba(255,255,255,.1)}
+.wl-badge.table{background:rgba(52,152,219,.2);color:#3498db}
+.wl-badge.slot{background:rgba(155,89,182,.2);color:#bb86fc}
+
+/* === REPORTS TAB === */
+.reports-wrap{padding:10px}
+.reports-wrap h3{color:var(--gold);margin-bottom:15px;font-size:1.2em}
+.reports-filters{background:var(--card);border-radius:10px;padding:12px;margin-bottom:15px;border:1px solid #333;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.filter-group{display:flex;flex-direction:column}
+.filter-group label{font-size:.85em;color:var(--dim);margin-bottom:4px;font-weight:700}
+.filter-group input,.filter-group select{padding:6px;border-radius:6px;border:1px solid #444;background:#222;color:#fff;font-size:.9em}
+.reports-summary{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:15px}
+@media(min-width:600px){.reports-summary{grid-template-columns:repeat(4,1fr)}}
+.metric-box{background:var(--card);border-radius:10px;padding:12px;border:1px solid #333;text-align:center}
+.metric-label{font-size:.75em;color:var(--dim);text-transform:uppercase;margin-bottom:6px}
+.metric-value{font-size:1.5em;font-weight:700;color:var(--gold)}
+.reports-breakdown{background:var(--card);border-radius:10px;padding:12px;margin-bottom:15px;border:1px solid #333}
+.reports-breakdown h4{color:var(--gold);margin-bottom:8px;font-size:.95em}
+.rpt-table{width:100%;border-collapse:collapse;font-size:.85em}
+.rpt-table th{background:var(--acc);padding:6px;text-align:left;font-weight:700;color:var(--txt)}
+.rpt-table td{padding:6px;border-bottom:1px solid #333}
+.rpt-table tr:hover{background:rgba(255,255,255,.03)}
+.reports-export{display:flex;gap:8px;margin-top:15px}
+.btn-export{flex:1;padding:10px;background:var(--gold);color:#000;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:.9em}
+
+/* === RESPONSIVE === */
+@media(min-width:700px){body{max-width:700px;margin:0 auto}}
+
 /* === RESPONSIVE === */
 @media(min-width:700px){body{max-width:700px;margin:0 auto}}
 </style>
@@ -434,6 +487,7 @@ button{font-family:inherit}
   <input type="date" id="iDate">
   <input type="text" id="iCasino" placeholder="Casino" data-i18n-ph="casino_ph">
   <span class="spacer"></span>
+  <button class="lang-btn" onclick="window.open('https://www.layfive.com/','_blank')" title="Back to website" style="background:var(--gold);color:#000;padding:4px 8px;border-radius:4px;border:none;font-weight:700;font-size:.8em;cursor:pointer">🏠 Web</button>
   <button class="lang-btn" onclick="toggleLang()" id="langBtn">中</button>
   <button class="profile-btn" onclick="showTab(3)" title="Profile">👤</button>
 </div>
@@ -446,6 +500,8 @@ button{font-family:inherit}
   <button class="tab" onclick="showTab(3)" data-i18n="tab_sessions">Sessions</button>
   <button class="tab" onclick="showTab(4)" data-i18n="tab_profile">Profile</button>
   <button class="tab" onclick="showTab(5)" data-i18n="tab_practice">Practice</button>
+  <button class="tab" onclick="showTab(6)" data-i18n="tab_wl">W/L Log</button>
+  <button class="tab" onclick="showTab(7)" data-i18n="tab_reports">Reports</button>
 </div>
 
 <!-- ==================== SCORECARD TAB ==================== -->
@@ -685,6 +741,127 @@ button{font-family:inherit}
   </div>
 </div>
 
+<!-- ==================== W/L LOG TAB ==================== -->
+<div class="pane" id="p6">
+  <div class="wl-wrap">
+    <div class="wl-form-card">
+      <h3 data-i18n="wl_form_title">Record Win/Loss</h3>
+      <div class="form-group">
+        <label data-i18n="wl_casino">Casino Name</label>
+        <input type="text" id="wlCasino" placeholder="e.g., Bellagio" data-i18n-ph="wl_casino_ph">
+      </div>
+      <div class="form-group">
+        <label data-i18n="wl_game_type">Game Type</label>
+        <select id="wlGameType">
+          <option value="">Select game type...</option>
+        </select>
+        <small id="wlGameCustomAdd" style="display:none;color:var(--gold);cursor:pointer;margin-top:4px" data-i18n="wl_add_custom">+ Add custom game type</small>
+      </div>
+      <div class="form-group">
+        <label data-i18n="wl_table_slot">Table or Slot?</label>
+        <div class="toggle-btns">
+          <button class="toggle-btn active" id="wlToggleTable" onclick="setTableOrSlot('table')" data-i18n="wl_table">Table Game</button>
+          <button class="toggle-btn" id="wlToggleSlot" onclick="setTableOrSlot('slot')" data-i18n="wl_slot">Slot Machine</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label data-i18n="wl_amount">Dollar Amount</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="amount-toggle" id="wlAmountToggle" onclick="toggleWinLoss()" style="background:var(--w);color:#fff;border:none;border-radius:6px;padding:8px 12px;font-weight:700;cursor:pointer;min-width:50px">+ Win</button>
+          <input type="number" id="wlAmount" placeholder="0.00" style="flex:1;padding:8px;border-radius:6px;border:1px solid #444;background:#222;color:#fff">
+        </div>
+      </div>
+      <button class="btn-save-wl" onclick="saveWLEntry()" data-i18n="wl_save_btn" style="width:100%;padding:10px;background:var(--gold);color:#000;border:none;border-radius:6px;font-weight:700;cursor:pointer;margin-top:12px">Save Entry</button>
+    </div>
+    <div class="wl-history">
+      <h3 data-i18n="wl_history_title">Recent Entries</h3>
+      <div id="wlHistoryList" style="max-height:calc(100vh - 320px);overflow-y:auto"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== REPORTS TAB ==================== -->
+<div class="pane" id="p7">
+  <div class="reports-wrap">
+    <h3 data-i18n="reports_title">Reports & Analytics</h3>
+
+    <!-- Filters -->
+    <div class="reports-filters">
+      <div class="filter-group">
+        <label data-i18n="reports_date_range">Date Range</label>
+        <select id="rptDateRange" onchange="refreshReports()">
+          <option value="ytd">Year-to-Date</option>
+          <option value="monthly">Monthly</option>
+          <option value="weekly">Weekly</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+      <div class="filter-group" id="rptMonthPicker" style="display:none">
+        <label data-i18n="reports_month">Month</label>
+        <input type="month" id="rptMonth" onchange="refreshReports()">
+      </div>
+      <div class="filter-group" id="rptWeekPicker" style="display:none">
+        <label data-i18n="reports_week">Week</label>
+        <input type="number" id="rptWeek" min="1" max="53" onchange="refreshReports()" placeholder="Week #">
+      </div>
+      <div class="filter-group" id="rptCustomPicker" style="display:none">
+        <label data-i18n="reports_from">From</label>
+        <input type="date" id="rptFromDate" onchange="refreshReports()">
+        <label data-i18n="reports_to">To</label>
+        <input type="date" id="rptToDate" onchange="refreshReports()">
+      </div>
+      <div class="filter-group">
+        <label data-i18n="reports_casino">Casino</label>
+        <select id="rptCasino" onchange="refreshReports()">
+          <option value="">All Casinos</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Summary metrics -->
+    <div class="reports-summary">
+      <div class="metric-box">
+        <div class="metric-label" data-i18n="reports_sessions">Sessions</div>
+        <div class="metric-value" id="rptSessions">0</div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-label" data-i18n="reports_won">Total Won</div>
+        <div class="metric-value" id="rptWon" style="color:var(--w)">$0</div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-label" data-i18n="reports_lost">Total Lost</div>
+        <div class="metric-value" id="rptLost" style="color:var(--f)">$0</div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-label" data-i18n="reports_net">Net Result</div>
+        <div class="metric-value" id="rptNet">$0</div>
+      </div>
+    </div>
+
+    <!-- Charts container -->
+    <div id="rptChartsContainer">
+      <canvas id="rptTrendChart" style="max-width:100%;margin:20px 0"></canvas>
+    </div>
+
+    <!-- Breakdown tables -->
+    <div class="reports-breakdown">
+      <h4 data-i18n="reports_by_game">By Game Type</h4>
+      <table class="rpt-table" id="rptGameTable"></table>
+    </div>
+
+    <div class="reports-breakdown">
+      <h4 data-i18n="reports_by_casino">By Casino</h4>
+      <table class="rpt-table" id="rptCasinoTable"></table>
+    </div>
+
+    <!-- Export buttons -->
+    <div class="reports-export">
+      <button class="btn-export" onclick="exportReportsPDF()" data-i18n="reports_export_pdf">📄 Export PDF</button>
+      <button class="btn-export" onclick="exportReportsExcel()" data-i18n="reports_export_excel">📊 Export Excel</button>
+    </div>
+  </div>
+</div>
+
 </div><!-- end screenApp -->
 
 <script>
@@ -840,6 +1017,38 @@ const T = {
   practice_history: {en:'Recent Spins', zh:'最近旋转'},
   practice_signal: {en:'Strategy Signals', zh:'策略信号'},
   practice_start: {en:'START', zh:'开始'},
+  // W/L Log
+  tab_wl: {en:'W/L Log', zh:'赢亏日志'},
+  wl_form_title: {en:'Record Win/Loss', zh:'记录赢亏'},
+  wl_casino: {en:'Casino Name', zh:'赌场名称'},
+  wl_casino_ph: {en:'e.g., Bellagio', zh:'例如：Bellagio'},
+  wl_game_type: {en:'Game Type', zh:'游戏类型'},
+  wl_table_slot: {en:'Table or Slot?', zh:'桌游还是老虎机？'},
+  wl_table: {en:'Table Game', zh:'桌游'},
+  wl_slot: {en:'Slot Machine', zh:'老虎机'},
+  wl_amount: {en:'Dollar Amount', zh:'美元金额'},
+  wl_save_btn: {en:'Save Entry', zh:'保存条目'},
+  wl_history_title: {en:'Recent Entries', zh:'最近条目'},
+  wl_add_custom: {en:'+ Add custom game type', zh:'+ 添加自定义游戏类型'},
+  wl_prompt_custom: {en:'Add "{name}" as a new game type?', zh:'将"{name}"添加为新的游戏类型？'},
+
+  // Reports
+  tab_reports: {en:'Reports', zh:'报表'},
+  reports_title: {en:'Reports & Analytics', zh:'报表与分析'},
+  reports_date_range: {en:'Date Range', zh:'日期范围'},
+  reports_month: {en:'Month', zh:'月份'},
+  reports_week: {en:'Week', zh:'周'},
+  reports_from: {en:'From', zh:'从'},
+  reports_to: {en:'到', zh:'到'},
+  reports_casino: {en:'Casino', zh:'赌场'},
+  reports_sessions: {en:'Sessions', zh:'场次'},
+  reports_won: {en:'Total Won', zh:'总赢'},
+  reports_lost: {en:'Total Lost', zh:'总输'},
+  reports_net: {en:'Net Result', zh:'净结果'},
+  reports_by_game: {en:'By Game Type', zh:'按游戏类型'},
+  reports_by_casino: {en:'By Casino', zh:'按赌场'},
+  reports_export_pdf: {en:'📄 Export PDF', zh:'📄 导出 PDF'},
+  reports_export_excel: {en:'📊 Export Excel', zh:'📊 导出 Excel'},
 };
 
 function t(key){ return (T[key]&&T[key][lang]) || key; }
@@ -1440,6 +1649,8 @@ function showTab(i){
   if(i===2)refreshAnalysis();
   if(i===3)refreshSessions();
   if(i===5)initPractice();
+  if(i===6)initWLTab();
+  if(i===7)initReportsTab();
 }
 
 // ===== REFRESH ALL =====
@@ -3214,6 +3425,412 @@ function updateCoverDisplay(){
   document.getElementById('coverDetail').innerHTML=
     '<span style="color:var(--gold);font-weight:700">'+allExtra.length+'</span> '+t('cover_extra')+
     ' · <span style="color:var(--gold);font-weight:700">'+extraUnits+'</span> '+t('cover_extra_units');
+}
+// ===== W/L LOG TAB =====
+const DEFAULT_GAMES=['Baccarat','Blackjack','Craps','Roulette','Slots'];
+let wlTableOrSlot='table';
+let wlIsWin=true;
+
+function initWLTab(){
+  loadWLEntries();
+  initGameTypeDropdown();
+  refreshWLHistory();
+}
+
+function initGameTypeDropdown(){
+  const sel=document.getElementById('wlGameType');
+  const customGames=JSON.parse(localStorage.getItem('layfive_custom_games'))||[];
+  const allGames=[...DEFAULT_GAMES,...customGames];
+
+  sel.innerHTML='<option value="">Select game type...</option>';
+  allGames.forEach(g=>{
+    const opt=document.createElement('option');
+    opt.value=g;
+    opt.textContent=g;
+    sel.appendChild(opt);
+  });
+
+  sel.addEventListener('change',()=>{
+    const val=sel.value;
+    if(val&&!allGames.includes(val)){
+      const custom=val;
+      if(confirm(t('wl_prompt_custom').replace('{name}',custom))){
+        customGames.push(custom);
+        localStorage.setItem('layfive_custom_games',JSON.stringify(customGames));
+        initGameTypeDropdown();
+        sel.value=custom;
+      }else{
+        sel.value='';
+      }
+    }
+  });
+}
+
+function setTableOrSlot(type){
+  wlTableOrSlot=type;
+  document.getElementById('wlToggleTable').classList.toggle('active',type==='table');
+  document.getElementById('wlToggleSlot').classList.toggle('active',type==='slot');
+}
+
+function toggleWinLoss(){
+  wlIsWin=!wlIsWin;
+  const btn=document.getElementById('wlAmountToggle');
+  if(wlIsWin){
+    btn.textContent='+ Win';
+    btn.style.background='var(--w)';
+  }else{
+    btn.textContent='- Loss';
+    btn.style.background='var(--f)';
+  }
+}
+
+function saveWLEntry(){
+  const casino=document.getElementById('wlCasino').value.trim();
+  const gameType=document.getElementById('wlGameType').value.trim();
+  const amountStr=document.getElementById('wlAmount').value.trim();
+
+  if(!casino){alert('Casino name required');return}
+  if(!gameType){alert('Game type required');return}
+  if(!amountStr){alert('Amount required');return}
+
+  const amount=parseFloat(amountStr);
+  if(isNaN(amount)||amount<=0){alert('Invalid amount');return}
+
+  const entries=JSON.parse(localStorage.getItem('layfive_wl_entries'))||[];
+  const entry={
+    id:Date.now(),
+    casino,
+    tableOrSlot:wlTableOrSlot,
+    gameType,
+    amount:wlIsWin?amount:-amount,
+    timestamp:new Date().toISOString()
+  };
+
+  entries.push(entry);
+  localStorage.setItem('layfive_wl_entries',JSON.stringify(entries));
+
+  document.getElementById('wlCasino').value='';
+  document.getElementById('wlGameType').value='';
+  document.getElementById('wlAmount').value='';
+  wlTableOrSlot='table';
+  wlIsWin=true;
+  document.getElementById('wlToggleTable').classList.add('active');
+  document.getElementById('wlToggleSlot').classList.remove('active');
+  document.getElementById('wlAmountToggle').textContent='+ Win';
+  document.getElementById('wlAmountToggle').style.background='var(--w)';
+
+  refreshWLHistory();
+}
+
+function loadWLEntries(){
+  return JSON.parse(localStorage.getItem('layfive_wl_entries'))||[];
+}
+
+function refreshWLHistory(){
+  const entries=loadWLEntries();
+  entries.sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
+
+  const list=document.getElementById('wlHistoryList');
+  if(entries.length===0){
+    list.innerHTML='<p style="text-align:center;color:var(--dim);padding:20px">No entries yet</p>';
+    return;
+  }
+
+  list.innerHTML=entries.map(e=>{
+    const d=new Date(e.timestamp);
+    const dateStr=d.toLocaleDateString()+' '+d.toLocaleTimeString().substring(0,5);
+    const isWin=e.amount>0;
+    const amountClr=isWin?'var(--w)':'var(--f)';
+    const amountTxt=isWin?'+$'+e.amount.toFixed(2):'-$'+Math.abs(e.amount).toFixed(2);
+    const badge=e.tableOrSlot==='table'?'<span class="wl-badge table">Table</span>':'<span class="wl-badge slot">Slot</span>';
+
+    return `<div class="wl-entry">
+      <div class="wl-entry-info">
+        <div class="wl-entry-date">${dateStr}</div>
+        <div class="wl-entry-casino">${e.casino}</div>
+        <div class="wl-entry-game">${badge} ${e.gameType}</div>
+      </div>
+      <div class="wl-entry-amount" style="color:${amountClr}">${amountTxt}</div>
+      <button class="wl-entry-delete" onclick="deleteWLEntry(${e.id})">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function deleteWLEntry(id){
+  if(!confirm('Delete this entry?'))return;
+  const entries=loadWLEntries();
+  const filtered=entries.filter(e=>e.id!==id);
+  localStorage.setItem('layfive_wl_entries',JSON.stringify(filtered));
+  refreshWLHistory();
+}
+
+// ===== REPORTS TAB =====
+let rptChart=null;
+
+function initReportsTab(){
+  initReportsFilters();
+  refreshReports();
+}
+
+function initReportsFilters(){
+  const dateRangeSelect=document.getElementById('rptDateRange');
+  dateRangeSelect.addEventListener('change',()=>{
+    document.getElementById('rptMonthPicker').style.display=dateRangeSelect.value==='monthly'?'flex':'none';
+    document.getElementById('rptWeekPicker').style.display=dateRangeSelect.value==='weekly'?'flex':'none';
+    document.getElementById('rptCustomPicker').style.display=dateRangeSelect.value==='custom'?'flex':'none';
+  });
+
+  const entries=loadWLEntries();
+  const casinos=new Set(entries.map(e=>e.casino));
+  const casinoSelect=document.getElementById('rptCasino');
+  Array.from(casinos).sort().forEach(c=>{
+    const opt=document.createElement('option');
+    opt.value=c;
+    opt.textContent=c;
+    casinoSelect.appendChild(opt);
+  });
+
+  if(!document.getElementById('rptMonth').value){
+    const now=new Date();
+    document.getElementById('rptMonth').value=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  }
+}
+
+function getFilteredEntries(){
+  const entries=loadWLEntries();
+  const range=document.getElementById('rptDateRange').value;
+  const casino=document.getElementById('rptCasino').value;
+
+  let filtered=entries;
+
+  if(casino){
+    filtered=filtered.filter(e=>e.casino===casino);
+  }
+
+  const now=new Date();
+  let startDate,endDate;
+
+  if(range==='ytd'){
+    startDate=new Date(now.getFullYear(),0,1);
+    endDate=now;
+  }else if(range==='monthly'){
+    const monthVal=document.getElementById('rptMonth').value;
+    if(monthVal){
+      const [yr,m]=monthVal.split('-');
+      startDate=new Date(yr,parseInt(m)-1,1);
+      endDate=new Date(yr,parseInt(m),0);
+    }
+  }else if(range==='weekly'){
+    const week=parseInt(document.getElementById('rptWeek').value)||1;
+    const jan4=new Date(now.getFullYear(),0,4);
+    const mon=new Date(jan4);
+    mon.setDate(jan4.getDate()-jan4.getDay()+1);
+    startDate=new Date(mon);
+    startDate.setDate(startDate.getDate()+(week-1)*7);
+    endDate=new Date(startDate);
+    endDate.setDate(endDate.getDate()+6);
+  }else if(range==='custom'){
+    const from=document.getElementById('rptFromDate').value;
+    const to=document.getElementById('rptToDate').value;
+    if(from)startDate=new Date(from);
+    if(to)endDate=new Date(to);
+  }
+
+  if(startDate)startDate.setHours(0,0,0,0);
+  if(endDate)endDate.setHours(23,59,59,999);
+
+  if(startDate||endDate){
+    filtered=filtered.filter(e=>{
+      const eDate=new Date(e.timestamp);
+      return(!startDate||eDate>=startDate)&&(!endDate||eDate<=endDate);
+    });
+  }
+
+  return filtered;
+}
+
+function refreshReports(){
+  const filtered=getFilteredEntries();
+
+  // Summary metrics
+  const sessions=filtered.length;
+  const won=filtered.filter(e=>e.amount>0).reduce((s,e)=>s+e.amount,0);
+  const lost=Math.abs(filtered.filter(e=>e.amount<0).reduce((s,e)=>s+e.amount,0));
+  const net=won-lost;
+
+  document.getElementById('rptSessions').textContent=sessions;
+  document.getElementById('rptWon').textContent='$'+won.toFixed(2);
+  document.getElementById('rptLost').textContent='$'+lost.toFixed(2);
+  document.getElementById('rptNet').textContent=(net>=0?'$':'−$')+Math.abs(net).toFixed(2);
+  document.getElementById('rptNet').style.color=net>=0?'var(--w)':'var(--f)';
+
+  // Breakdown by game type
+  const gameStats={};
+  filtered.forEach(e=>{
+    if(!gameStats[e.gameType])gameStats[e.gameType]={sessions:0,won:0,lost:0};
+    gameStats[e.gameType].sessions++;
+    if(e.amount>0)gameStats[e.gameType].won+=e.amount;
+    else gameStats[e.gameType].lost+=Math.abs(e.amount);
+  });
+
+  let gameHtml='<tr><th>Game</th><th>Sessions</th><th>Won</th><th>Lost</th><th>Net</th></tr>';
+  Object.keys(gameStats).sort().forEach(g=>{
+    const s=gameStats[g];
+    const net=s.won-s.lost;
+    gameHtml+=`<tr><td>${g}</td><td>${s.sessions}</td><td style="color:var(--w)">$${s.won.toFixed(2)}</td><td style="color:var(--f)">$${s.lost.toFixed(2)}</td><td style="color:${net>=0?'var(--w)':'var(--f)'}">${net>=0?'+':'−'}$${Math.abs(net).toFixed(2)}</td></tr>`;
+  });
+  document.getElementById('rptGameTable').innerHTML=gameHtml;
+
+  // Breakdown by casino
+  const casinoStats={};
+  filtered.forEach(e=>{
+    if(!casinoStats[e.casino])casinoStats[e.casino]={sessions:0,won:0,lost:0};
+    casinoStats[e.casino].sessions++;
+    if(e.amount>0)casinoStats[e.casino].won+=e.amount;
+    else casinoStats[e.casino].lost+=Math.abs(e.amount);
+  });
+
+  let casinoHtml='<tr><th>Casino</th><th>Sessions</th><th>Won</th><th>Lost</th><th>Net</th></tr>';
+  Object.keys(casinoStats).sort().forEach(c=>{
+    const s=casinoStats[c];
+    const net=s.won-s.lost;
+    casinoHtml+=`<tr><td>${c}</td><td>${s.sessions}</td><td style="color:var(--w)">$${s.won.toFixed(2)}</td><td style="color:var(--f)">$${s.lost.toFixed(2)}</td><td style="color:${net>=0?'var(--w)':'var(--f)'}">${net>=0?'+':'−'}$${Math.abs(net).toFixed(2)}</td></tr>`;
+  });
+  document.getElementById('rptCasinoTable').innerHTML=casinoHtml;
+
+  // Trend chart
+  drawTrendChart(filtered);
+}
+
+function drawTrendChart(entries){
+  if(entries.length===0){
+    document.getElementById('rptChartsContainer').innerHTML='<p style="text-align:center;color:var(--dim);padding:20px">No data for selected filters</p>';
+    return;
+  }
+
+  // Group by week
+  const weekly={};
+  entries.forEach(e=>{
+    const d=new Date(e.timestamp);
+    const weekStart=new Date(d);
+    weekStart.setDate(d.getDate()-d.getDay()+1);
+    const weekKey=weekStart.toISOString().substring(0,10);
+    if(!weekly[weekKey])weekly[weekKey]={won:0,lost:0};
+    if(e.amount>0)weekly[weekKey].won+=e.amount;
+    else weekly[weekKey].lost+=Math.abs(e.amount);
+  });
+
+  const weeks=Object.keys(weekly).sort();
+  const labels=weeks.map(w=>new Date(w).toLocaleDateString(undefined,{month:'short',day:'numeric'}));
+  const dataWon=weeks.map(w=>weekly[w].won);
+  const dataLost=weeks.map(w=>-weekly[w].lost);
+  const dataCum=[];
+  let cum=0;
+  weeks.forEach(w=>{
+    cum+=weekly[w].won-weekly[w].lost;
+    dataCum.push(cum);
+  });
+
+  const canvas=document.getElementById('rptTrendChart');
+  if(!canvas)return;
+
+  if(rptChart){rptChart.destroy()}
+
+  const ctx=canvas.getContext('2d');
+  rptChart=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {label:'Won',data:dataWon,backgroundColor:'rgba(42,138,42,.6)',borderColor:'var(--w)',borderWidth:2},
+        {label:'Lost',data:dataLost,backgroundColor:'rgba(208,48,0,.6)',borderColor:'var(--f)',borderWidth:2},
+        {label:'Cumulative',data:dataCum,type:'line',borderColor:'var(--gold)',borderWidth:3,fill:false,tension:0.4,yAxisID:'y1'}
+      ]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:true,
+      plugins:{legend:{labels:{color:'var(--txt)'}}},
+      scales:{
+        y:{ticks:{color:'var(--txt)'},grid:{color:'#333'},beginAtZero:true},
+        y1:{type:'linear',position:'right',ticks:{color:'var(--gold)'},grid:{display:false}}
+      }
+    }
+  });
+}
+
+function exportReportsPDF(){
+  const filtered=getFilteredEntries();
+  if(filtered.length===0){alert('No data to export');return}
+
+  const html=`
+<div style="padding:20px;font-family:Arial,sans-serif;color:#333">
+  <h1>LayFive W/L Report</h1>
+  <p style="color:#666">${new Date().toLocaleDateString()}</p>
+
+  <div style="margin:20px 0;background:#f0f0f0;padding:15px;border-radius:8px">
+    <h3>Summary</h3>
+    <p><strong>Sessions:</strong> ${filtered.length}</p>
+    <p><strong>Total Won:</strong> $${filtered.filter(e=>e.amount>0).reduce((s,e)=>s+e.amount,0).toFixed(2)}</p>
+    <p><strong>Total Lost:</strong> $${Math.abs(filtered.filter(e=>e.amount<0).reduce((s,e)=>s+e.amount,0)).toFixed(2)}</p>
+    <p><strong>Net:</strong> $${(filtered.reduce((s,e)=>s+e.amount,0)).toFixed(2)}</p>
+  </div>
+
+  <h3>Entries</h3>
+  <table style="width:100%;border-collapse:collapse;margin:20px 0">
+    <tr style="background:#ddd">
+      <th style="padding:8px;text-align:left;border:1px solid #ccc">Date</th>
+      <th style="padding:8px;text-align:left;border:1px solid #ccc">Casino</th>
+      <th style="padding:8px;text-align:left;border:1px solid #ccc">Game</th>
+      <th style="padding:8px;text-align:right;border:1px solid #ccc">Amount</th>
+    </tr>
+    ${filtered.sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).map(e=>{
+      const d=new Date(e.timestamp).toLocaleDateString();
+      return '<tr><td style="padding:8px;border:1px solid #ccc">'+d+'</td><td style="padding:8px;border:1px solid #ccc">'+e.casino+'</td><td style="padding:8px;border:1px solid #ccc">'+e.gameType+'</td><td style="padding:8px;border:1px solid #ccc;text-align:right;color:'+(e.amount>=0?'green':'red')+'">'+(e.amount>=0?'+':'-')+'$'+Math.abs(e.amount).toFixed(2)+'</td></tr>';
+    }).join('')}
+  </table>
+</div>`;
+
+  const opt={margin:10,filename:'LayFive_Report_'+new Date().toISOString().substring(0,10)+'.pdf',image:{type:'jpeg',quality:0.98},html2canvas:{scale:2},jsPDF:{orientation:'portrait',unit:'mm',format:'a4'}};
+  html2pdf().set(opt).from(html).save();
+}
+
+function exportReportsExcel(){
+  const filtered=getFilteredEntries();
+  if(filtered.length===0){alert('No data to export');return}
+
+  const wb=XLSX.utils.book_new();
+
+  const entriesData=filtered.map(e=>{
+    const d=new Date(e.timestamp);
+    return {
+      Date:d.toLocaleDateString(),
+      Time:d.toLocaleTimeString(),
+      Casino:e.casino,
+      GameType:e.gameType,
+      Type:e.tableOrSlot==='table'?'Table':'Slot',
+      Amount:e.amount
+    };
+  });
+
+  const ws1=XLSX.utils.json_to_sheet(entriesData);
+  XLSX.utils.book_append_sheet(wb,ws1,'Entries');
+
+  const won=filtered.filter(e=>e.amount>0).reduce((s,e)=>s+e.amount,0);
+  const lost=Math.abs(filtered.filter(e=>e.amount<0).reduce((s,e)=>s+e.amount,0));
+  const net=won-lost;
+
+  const summaryData=[
+    {Metric:'Total Sessions',Value:filtered.length},
+    {Metric:'Total Won',Value:won},
+    {Metric:'Total Lost',Value:lost},
+    {Metric:'Net Result',Value:net}
+  ];
+
+  const ws2=XLSX.utils.json_to_sheet(summaryData);
+  XLSX.utils.book_append_sheet(wb,ws2,'Summary');
+
+  XLSX.writeFile(wb,'LayFive_Report_'+new Date().toISOString().substring(0,10)+'.xlsx');
 }
 </script>
 
