@@ -264,12 +264,18 @@
       '<span>Spins: <b>' + pnl.spinsPlayed + '</b></span>' +
       '<span>P&amp;L: <b style="color:' + plColor + '">' + fmt(pnl.netPL) + ' (' + (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%)</b></span>' +
       '<span>Remaining: <b>' + fmt(rem) + '</b> / start ' + fmt(pnl.startBankroll) + '</span>' +
-      '<span style="margin-left:auto;display:flex;gap:6px">' +
+      '<span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">' +
         '<button id="pnl-switch-btn" style="background:#5a3a8a;color:#fff;border:1px solid #8a6acc;border-radius:6px;padding:3px 8px;font-size:.9em;cursor:pointer">Switch</button>' +
+        '<button id="pnl-tolog-btn" style="background:#2e7d32;color:#fff;border:1px solid #66bb6a;border-radius:6px;padding:3px 8px;font-size:.9em;cursor:pointer" title="Send this live P&L total to the W/L Log tab">💵 &rarr; W/L Log</button>' +
         '<button id="pnl-end-btn" style="background:#6b0f0f;color:#fff;border:1px solid #c94a4a;border-radius:6px;padding:3px 8px;font-size:.9em;cursor:pointer">End</button>' +
       '</span>';
     var sw = document.getElementById('pnl-switch-btn');
     if (sw) sw.onclick = function () { openSetupModal(true); };
+    var tl = document.getElementById('pnl-tolog-btn');
+    if (tl) tl.onclick = function () {
+      if (typeof window.saveLivePnlToWLLog === 'function') window.saveLivePnlToWLLog();
+      else alert('W/L Log handler not loaded yet. Please reload the page.');
+    };
     var en = document.getElementById('pnl-end-btn');
     if (en) en.onclick = endSession;
   }
