@@ -128,18 +128,37 @@
       start.style.display = ''; join.style.display = '';
       leave.style.display = 'none'; fork.style.display = 'none';
     }
-    // Lock scorecard input for viewers UNLESS they've forked
+    // Lock number-entry for viewers (but allow suggestion popups)
     var pane = document.getElementById('p0');
     if (!pane) return;
     var lock = state.role === 'viewer' && !state.forked;
-    var sc = pane.querySelector('.sc-wrap');
-    if (sc) sc.style.pointerEvents = lock ? 'none' : '';
+    installNumPopupGuard();
+    // Dim the number-entry cells visually so viewer knows they can't tap them
+    var snCells = pane.querySelectorAll('.sn');
+    snCells.forEach(function (c) {
+      c.style.opacity = lock ? 0.55 : '';
+      c.style.cursor = lock ? 'not-allowed' : '';
+    });
     var btns = pane.querySelectorAll('.actions button');
     btns.forEach(function (b) {
       if (b.classList.contains('btn-ref')) return;
       b.disabled = lock;
       b.style.opacity = lock ? 0.4 : '';
     });
+  }
+ 
+  // ---------- Viewer guard: block number entry but keep suggestions ----------
+  function installNumPopupGuard() {
+    if (window._lfOrigOpenNumPopup) return;
+    if (typeof window.openNumPopup !== 'function') return;
+    window._lfOrigOpenNumPopup = window.openNumPopup;
+    window.openNumPopup = function (row) {
+      if (state.role === 'viewer' && !state.forked) {
+        showBanner('You\'re viewing the host\'s scorecard. Tap "📋 Copy & Fork" to start your own tracker.', 'warn');
+        return;
+      }
+      return window._lfOrigOpenNumPopup.apply(this, arguments);
+    };
   }
  
   // ---------- Host: hook addSpin to capture numbers ----------
@@ -351,6 +370,9 @@
  
   function init() {
     buildUI();
+    installNumPopupGuard();
+    setTimeout(installNumPopupGuard, 500);
+    setTimeout(installNumPopupGuard, 2000);
     ensureClient().catch(function () {});
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
