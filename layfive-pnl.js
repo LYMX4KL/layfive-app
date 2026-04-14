@@ -46,7 +46,11 @@
 
   // ---------- helpers ----------
   function costPerSpin() { return SPOTS_PER_SPIN * pnl.unitCount * pnl.unitValue; }
-  function fmt(n) { return (n < 0 ? '-' : '') + '$' + Math.abs(Math.round(n * 100) / 100).toFixed(2); }
+  function fmt(n) {
+    var abs = Math.abs(Math.round(n * 100) / 100);
+    var s = (abs % 1 === 0) ? abs.toFixed(0) : abs.toFixed(2);
+    return (n < 0 ? '-' : '') + '$' + s;
+  }
   function remaining() { return pnl.startBankroll + pnl.netPL; }
 
   function netForHit(type) {
@@ -304,7 +308,7 @@
       if (!pnl.active) return;
       var td = document.createElement('td');
       td.className = 'pnl-c sn';
-      td.style.cssText = 'font-size:.85em;font-weight:700;text-align:center;padding:2px 3px;font-variant-numeric:tabular-nums;line-height:1.15;background:rgba(0,0,0,.25)';
+      td.style.cssText = 'font-size:.8em;font-weight:900;text-align:center;padding:2px 1px;font-variant-numeric:tabular-nums;line-height:1.1;background:rgba(0,0,0,.25);overflow:hidden;letter-spacing:-0.3px;white-space:nowrap';
       var rowNum = idx + 1;
       var entry = pnl.history.find(function (h) { return h.spinIdx === rowNum; });
       if (entry) {
