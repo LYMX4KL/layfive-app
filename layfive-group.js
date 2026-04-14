@@ -28,11 +28,14 @@
     sessionId: null,
     code: null,
     channel: null,
-    publishedUpTo: 0,    // host: number of spins published so far (1-based count)
+    hostBuffer: [],      // host: pending {idx, num} to publish
+    hostNextIdx: 1,      // host: next spin_index to assign (1-based)
+    publishedUpTo: 0,    // host: highest idx confirmed published
     viewerSeenMax: 0,    // viewer: highest spin_index applied
     hostTimer: null,
     viewerTimer: null,
-    forked: false        // viewer: true once they fork to local session
+    forked: false,       // viewer: true once they fork to local session
+    applyingRemote: false
   };
  
   function uuid() {
@@ -139,34 +142,44 @@
     });
   }
  
+  // ---------- Host: hook addSpin to capture numbers ----------
+  function installHostHook() {
+    if (typeof window.addSpin !== 'function') return false;
+    if (window._lfOrigAddSpin) return true;
+    window._lfOrigAddSpin = window.addSpin;
+    window.addSpin = function (num) {
+      var res = window._lfOrigAddSpin.apply(this, arguments);
+      try {
+        if (!state.applyingRemote && state.role === 'host' && typeof num === 'number') {
+          state.hostBuffer.push({ idx: state.hostNextIdx++, num: num });
+        }
+      } catch (e) { console.warn('[group] capture failed', e); }
+      return res;
+    };
+    console.log('[group] host hook installed');
+    return true;
+  }
+ 
   // ---------- Host: publish loop ----------
   function hostPublishTick() {
     if (state.role !== 'host' || !sb || !state.sessionId) return;
-    var spins = window.spins || [];
-    if (spins.length <= state.publishedUpTo) return;
-    var batch = [];
-    for (var i = state.publishedUpTo; i < spins.length; i++) {
-      var s = spins[i];
-      var num = (s && typeof s === 'object') ? (s.num != null ? s.num : s.number) : s;
-      if (typeof num !== 'number') continue;
-      batch.push({ session_id: state.sessionId, spin_index: i + 1, number: num });
-    }
-    if (!batch.length) return;
-    var firstIdx = state.publishedUpTo;
-    var newCursor = spins.length;
-    // Optimistically advance cursor; rollback on failure
-    state.publishedUpTo = newCursor;
+    if (!state.hostBuffer.length) return;
+    var snapshot = state.hostBuffer.slice();
+    var batch = snapshot.map(function (e) {
+      return { session_id: state.sessionId, spin_index: e.idx, number: e.num };
+    });
     sb.from('group_spins').upsert(batch, { onConflict: 'session_id,spin_index', ignoreDuplicates: true })
       .then(function (r) {
         if (r && r.error) {
           console.warn('[group] publish error', r.error);
-          state.publishedUpTo = firstIdx; // retry next tick
+          return;
         }
+        // drop the items we successfully published from the buffer
+        var lastIdx = snapshot[snapshot.length - 1].idx;
+        state.hostBuffer = state.hostBuffer.filter(function (e) { return e.idx > lastIdx; });
+        state.publishedUpTo = lastIdx;
       })
-      .catch(function (e) {
-        console.warn('[group] publish exception', e);
-        state.publishedUpTo = firstIdx;
-      });
+      .catch(function (e) { console.warn('[group] publish exception', e); });
   }
   function startHostLoop() {
     stopHostLoop();
@@ -218,13 +231,27 @@
         state.role = 'host';
         state.sessionId = row.id;
         state.code = row.code;
+        state.hostBuffer = [];
+        state.hostNextIdx = 1;
         state.publishedUpTo = 0;
-        // Seed any existing local spins first, then let the publish loop take over.
+        installHostHook();
+        // Seed existing local spins by reading the scorecard cells (s1, s2, ...)
+        // This is resilient to whatever variable name the app uses internally.
+        var i = 1;
+        while (true) {
+          var cell = document.getElementById('s' + i);
+          if (!cell) break;
+          var txt = (cell.textContent || '').trim();
+          var n = parseInt(txt, 10);
+          if (isNaN(n)) break;
+          state.hostBuffer.push({ idx: state.hostNextIdx++, num: n });
+          i++;
+        }
         updateUI();
         showBanner('Group started — code <b style="letter-spacing:2px;font-size:1.2em">' + row.code + '</b> — share with friends (copied to clipboard).', 'ok');
         try { navigator.clipboard && navigator.clipboard.writeText(row.code); } catch (e) {}
         startHostLoop();
-        hostPublishTick(); // publish seed immediately
+        hostPublishTick();
       });
     }).catch(function (e) {
       console.error('[group]', e);
@@ -275,10 +302,11 @@
   }
  
   function applyRemoteSpin(num) {
-    // Do nothing if forked viewer doesn't want more mirrored spins? They keep mirroring per spec.
-    var fn = window._origAddSpin || window.addSpin;
+    var fn = window._lfOrigAddSpin || window.addSpin;
     if (typeof fn !== 'function') return;
+    state.applyingRemote = true;
     try { fn(num); } catch (e) { console.warn('[group] applyRemoteSpin failed', e); }
+    finally { state.applyingRemote = false; }
   }
  
   function subscribeSpins() {
