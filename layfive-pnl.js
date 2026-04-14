@@ -55,6 +55,14 @@
     if (type === 'sp') return SPLIT_NET_MUL * u;
     return MISS_NET_MUL * u;
   }
+  // Gross payout (cash returned) for this spin, including stake on winning spots.
+  // Straight = 36u, Split = 18u, Miss = 0.
+  function payoutForHit(type) {
+    var u = pnl.unitCount * pnl.unitValue;
+    if (type === 's') return 36 * u;
+    if (type === 'sp') return 18 * u;
+    return 0;
+  }
 
   function persist() {
     try { localStorage.setItem(LS_KEY, JSON.stringify(pnl)); } catch (e) {}
@@ -175,17 +183,30 @@
     var pane = document.getElementById('p0');
     if (!pane) return null;
     var wrap = document.getElementById('pnl-sticky-top');
-    if (wrap) return wrap;
+    if (wrap) { updateStickyTopOffset(); return wrap; }
     var actions = pane.querySelector('.actions');
     if (!actions) return null;
     wrap = document.createElement('div');
     wrap.id = 'pnl-sticky-top';
-    wrap.style.cssText = 'position:sticky;top:0;z-index:60;background:#0f1320;padding:4px 0;margin:0 -4px 4px;box-shadow:0 2px 6px rgba(0,0,0,.4)';
+    wrap.style.cssText = 'position:sticky;z-index:60;background:#0f1320;padding:4px 0;margin:0 -4px 4px;box-shadow:0 2px 6px rgba(0,0,0,.4)';
     actions.parentNode.insertBefore(wrap, actions);
     wrap.appendChild(actions);
     var gsBar = document.getElementById('gs-bar');
     if (gsBar) wrap.appendChild(gsBar);
+    updateStickyTopOffset();
+    window.addEventListener('resize', updateStickyTopOffset);
     return wrap;
+  }
+  // Sit below the app's existing sticky .top bar + .tabs strip so Undo stays visible.
+  function updateStickyTopOffset() {
+    var wrap = document.getElementById('pnl-sticky-top');
+    if (!wrap) return;
+    var off = 0;
+    var topBar = document.querySelector('.top');
+    var tabs = document.querySelector('.tabs');
+    if (topBar && getComputedStyle(topBar).position === 'sticky') off += topBar.offsetHeight;
+    if (tabs && getComputedStyle(tabs).position === 'sticky') off += tabs.offsetHeight;
+    wrap.style.top = off + 'px';
   }
 
   // ---------- Stats panel ----------
@@ -267,8 +288,19 @@
       var rowNum = idx + 1;
       var entry = pnl.history.find(function (h) { return h.spinIdx === rowNum; });
       if (entry) {
-        var color = entry.delta >= 0 ? '#7fdc7f' : '#ff7373';
-        td.innerHTML = '<span style="color:' + color + '">' + (entry.delta >= 0 ? '+' : '') + fmt(entry.delta) + '</span><br><span style="color:#888;font-size:.85em">' + fmt(entry.runningPL) + '</span>';
+        // Display: top = payout total this spin, bottom = net profit (+), or "$0 / $0" on miss.
+        var isWin = entry.hitType === 's' || entry.hitType === 'sp';
+        var payout = (typeof entry.payout === 'number') ? entry.payout : (isWin ? (entry.delta + 15 * pnl.unitCount * pnl.unitValue) : 0);
+        if (isWin) {
+          td.innerHTML =
+            '<span style="color:#7fdc7f">' + fmt(payout) + '</span>' +
+            '<br><span style="color:#7fdc7f;font-size:.85em">+' + fmt(entry.delta) + '</span>';
+        } else {
+          // Miss: $0 payout on top, actual loss (-$X) on bottom.
+          td.innerHTML =
+            '<span style="color:#888">$0</span>' +
+            '<br><span style="color:#ff7373;font-size:.85em">' + fmt(entry.delta) + '</span>';
+        }
       } else {
         td.textContent = '';
       }
@@ -296,7 +328,7 @@
           var delta = netForHit(ht);
           pnl.netPL += delta;
           pnl.spinsPlayed += 1;
-          pnl.history.push({ spinIdx: spinIdx, num: num, hitType: ht, delta: delta, runningPL: pnl.netPL });
+          pnl.history.push({ spinIdx: spinIdx, num: num, hitType: ht, delta: delta, payout: payoutForHit(ht), runningPL: pnl.netPL });
           persist();
           refreshStatsPanel();
           // Re-inject immediately so the current spin's P&L shows up now,
@@ -326,8 +358,11 @@
 
   // Expose a helper so other layfive scripts can read spin count without poking internals.
   // The app uses `let spins` so window.spins is undefined; we count rows in the DOM.
+  // CRITICAL: exclude .pnl-c cells — our own injected P&L <td>s also carry the
+  // `sn` class for sizing, so a naive `.sn:not(.empty)` count would double (or
+  // more) and throw spinIdx completely off.
   window._lfGetSpinCount = function () {
-    var rows = document.querySelectorAll('.sc tbody tr .sn:not(.empty)');
+    var rows = document.querySelectorAll('.sc tbody tr td.sn:not(.empty):not(.pnl-c)');
     return rows.length;
   };
 
