@@ -22,7 +22,7 @@
  */
 (function () {
   'use strict';
- 
+
   var ELS = ['M', 'W', 'Wa', 'F', 'E'];
   var EL_NAMES = { M: 'Metal', W: 'Wood', Wa: 'Water', F: 'Fire', E: 'Earth' };
   var SPOTS_PER_SPIN = 15;
@@ -31,7 +31,7 @@
   var MISS_NET_MUL = -15;
   var MIN_BR_MUL = 60;
   var LS_KEY = 'lf_pnl_session_v1';
- 
+
   var pnl = {
     active: false,
     element: null,
@@ -43,19 +43,19 @@
     spinsPlayed: 0,
     history: []          // [{ spinIdx, num, hitType, delta, runningPL }]
   };
- 
+
   // ---------- helpers ----------
   function costPerSpin() { return SPOTS_PER_SPIN * pnl.unitCount * pnl.unitValue; }
   function fmt(n) { return (n < 0 ? '-' : '') + '$' + Math.abs(Math.round(n * 100) / 100).toFixed(2); }
   function remaining() { return pnl.startBankroll + pnl.netPL; }
- 
+
   function netForHit(type) {
     var u = pnl.unitCount * pnl.unitValue;
     if (type === 's') return STRAIGHT_NET_MUL * u;
     if (type === 'sp') return SPLIT_NET_MUL * u;
     return MISS_NET_MUL * u;
   }
- 
+
   function persist() {
     try { localStorage.setItem(LS_KEY, JSON.stringify(pnl)); } catch (e) {}
   }
@@ -69,7 +69,7 @@
       }
     } catch (e) {}
   }
- 
+
   // ---------- Setup modal ----------
   function openSetupModal(switching) {
     closeSetupModal();
@@ -102,7 +102,7 @@
       '</div>';
     overlay.appendChild(box);
     document.body.appendChild(overlay);
- 
+
     function recalc() {
       var uc = parseInt(document.getElementById('pnl-uc').value, 10) || 0;
       var uv = parseFloat(document.getElementById('pnl-uv').value) || 0;
@@ -129,7 +129,7 @@
     document.getElementById('pnl-uc').oninput = recalc;
     document.getElementById('pnl-uv').oninput = recalc;
     recalc();
- 
+
     document.getElementById('pnl-cancel').onclick = closeSetupModal;
     document.getElementById('pnl-ok').onclick = function () {
       var el = document.getElementById('pnl-el').value;
@@ -166,8 +166,29 @@
     var o = document.getElementById('pnl-setup-overlay');
     if (o) o.remove();
   }
- 
-  // ---------- Stats panel (sticky) ----------
+
+  // ---------- Sticky top wrapper ----------
+  // Groups .actions (incl. Undo), #gs-bar, and #pnl-stats into a single
+  // sticky container so the whole control strip stays visible while the
+  // scorecard scrolls.
+  function installStickyTop() {
+    var pane = document.getElementById('p0');
+    if (!pane) return null;
+    var wrap = document.getElementById('pnl-sticky-top');
+    if (wrap) return wrap;
+    var actions = pane.querySelector('.actions');
+    if (!actions) return null;
+    wrap = document.createElement('div');
+    wrap.id = 'pnl-sticky-top';
+    wrap.style.cssText = 'position:sticky;top:0;z-index:60;background:#0f1320;padding:4px 0;margin:0 -4px 4px;box-shadow:0 2px 6px rgba(0,0,0,.4)';
+    actions.parentNode.insertBefore(wrap, actions);
+    wrap.appendChild(actions);
+    var gsBar = document.getElementById('gs-bar');
+    if (gsBar) wrap.appendChild(gsBar);
+    return wrap;
+  }
+
+  // ---------- Stats panel ----------
   function buildStatsPanel() {
     var existing = document.getElementById('pnl-stats');
     if (existing) existing.remove();
@@ -176,11 +197,15 @@
     if (!pane) return;
     var panel = document.createElement('div');
     panel.id = 'pnl-stats';
-    panel.style.cssText = 'position:sticky;top:0;z-index:50;background:#0f1320;border:1px solid #d4af37;border-radius:8px;padding:8px 10px;margin:6px 0;font-size:.85em;color:#eee;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center';
+    panel.style.cssText = 'background:#0f1320;border:1px solid #d4af37;border-radius:8px;padding:8px 10px;margin:6px 0 0;font-size:.85em;color:#eee;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center';
     refreshStatsPanel(panel);
-    var scwrap = pane.querySelector('.sc-wrap');
-    if (scwrap) scwrap.parentNode.insertBefore(panel, scwrap);
-    else pane.appendChild(panel);
+    var wrap = installStickyTop();
+    if (wrap) wrap.appendChild(panel);
+    else {
+      var scwrap = pane.querySelector('.sc-wrap');
+      if (scwrap) scwrap.parentNode.insertBefore(panel, scwrap);
+      else pane.appendChild(panel);
+    }
   }
   function refreshStatsPanel(panel) {
     panel = panel || document.getElementById('pnl-stats');
@@ -210,34 +235,35 @@
     var p = document.getElementById('pnl-stats'); if (p) p.remove();
     injectColumn();
   }
- 
+
   // ---------- Column injection ----------
+  // Inserts the P&L column at position 2 (between # and Drop).
+  // Cell width matches the Drop column for a narrow layout.
   function injectColumn() {
-    // Header
     var head = document.querySelector('.sc thead tr');
     if (!head) return;
     var existingTh = head.querySelector('.pnl-h');
     if (pnl.active) {
       if (!existingTh) {
         var th = document.createElement('th');
-        th.className = 'pnl-h';
-        th.style.cssText = 'background:#0f1320;color:#d4af37;font-size:.8em;padding:4px';
+        th.className = 'pnl-h sn';
+        th.style.cssText = 'color:#d4af37;font-size:.8em;padding:2px';
         th.textContent = 'P&L';
-        head.appendChild(th);
+        // Insert after the first <th> (# column), before Drop
+        if (head.children.length >= 2) head.insertBefore(th, head.children[1]);
+        else head.appendChild(th);
       }
     } else if (existingTh) {
       existingTh.remove();
     }
-    // Body
     var rows = document.querySelectorAll('.sc tbody tr');
     rows.forEach(function (tr, idx) {
       var existing = tr.querySelector('.pnl-c');
       if (existing) existing.remove();
       if (!pnl.active) return;
       var td = document.createElement('td');
-      td.className = 'pnl-c';
-      td.style.cssText = 'font-size:.78em;text-align:right;padding:2px 6px;font-variant-numeric:tabular-nums';
-      // idx + 1 = row number; only spins after startSpinCount count for P&L
+      td.className = 'pnl-c sn';
+      td.style.cssText = 'font-size:.7em;text-align:center;padding:1px 2px;font-variant-numeric:tabular-nums;line-height:1.1';
       var rowNum = idx + 1;
       var entry = pnl.history.find(function (h) { return h.spinIdx === rowNum; });
       if (entry) {
@@ -246,10 +272,12 @@
       } else {
         td.textContent = '';
       }
-      tr.appendChild(td);
+      // Insert at position 1 (after # column, before Drop)
+      if (tr.children.length >= 2) tr.insertBefore(td, tr.children[1]);
+      else tr.appendChild(td);
     });
   }
- 
+
   // ---------- Hook addSpin to update P&L on each new spin ----------
   function installHook() {
     if (window._lfPnlHookInstalled) return true;
@@ -271,14 +299,17 @@
           pnl.history.push({ spinIdx: spinIdx, num: num, hitType: ht, delta: delta, runningPL: pnl.netPL });
           persist();
           refreshStatsPanel();
-          // injectColumn is called by the refreshAll hook below
+          // Re-inject immediately so the current spin's P&L shows up now,
+          // not on the next refresh. (refreshAll already ran inside orig.apply,
+          // before we pushed to history.)
+          injectColumn();
         }
       } catch (e) { console.warn('[pnl] update failed', e); }
       return res;
     };
     return true;
   }
- 
+
   // Hook refreshAll so our column is re-injected after every scorecard rebuild
   function installRefreshHook() {
     if (window._lfPnlRefreshHooked) return true;
@@ -292,14 +323,14 @@
     };
     return true;
   }
- 
+
   // Expose a helper so other layfive scripts can read spin count without poking internals.
   // The app uses `let spins` so window.spins is undefined; we count rows in the DOM.
   window._lfGetSpinCount = function () {
     var rows = document.querySelectorAll('.sc tbody tr .sn:not(.empty)');
     return rows.length;
   };
- 
+
   // ---------- Top-bar button ----------
   function buildButton() {
     var pane = document.getElementById('p0');
@@ -318,14 +349,15 @@
     btn.onclick = function () { openSetupModal(false); };
     bar.appendChild(btn);
   }
- 
+
   function init() {
     restore();
+    installStickyTop();
     buildButton();
     installHook();
     installRefreshHook();
-    setTimeout(function () { buildButton(); installHook(); installRefreshHook(); }, 500);
-    setTimeout(function () { buildButton(); installHook(); installRefreshHook(); }, 2000);
+    setTimeout(function () { installStickyTop(); buildButton(); installHook(); installRefreshHook(); }, 500);
+    setTimeout(function () { installStickyTop(); buildButton(); installHook(); installRefreshHook(); }, 2000);
     if (pnl.active) {
       buildStatsPanel();
       injectColumn();
