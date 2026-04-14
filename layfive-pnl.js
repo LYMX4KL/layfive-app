@@ -64,6 +64,19 @@
     return 0;
   }
 
+  // Re-sync netPL / spinsPlayed / history from current scorecard row count.
+  // Call after any refresh (covers Undo, row deletions, etc.) so the session
+  // total always matches what the user sees on-screen.
+  function resyncPL() {
+    if (!pnl.active) return;
+    var cnt = (typeof window._lfGetSpinCount === 'function') ? window._lfGetSpinCount() : 0;
+    pnl.history = pnl.history.filter(function (h) { return h.spinIdx <= cnt; });
+    var sum = 0;
+    for (var i = 0; i < pnl.history.length; i++) sum += pnl.history[i].delta;
+    pnl.netPL = sum;
+    pnl.spinsPlayed = pnl.history.length;
+  }
+
   function persist() {
     try { localStorage.setItem(LS_KEY, JSON.stringify(pnl)); } catch (e) {}
   }
@@ -101,6 +114,9 @@
       '</label>' +
       '<label style="display:block;margin:8px 0">Unit value ($):<br>' +
         '<input id="pnl-uv" type="number" min="0.01" step="0.01" value="' + (pnl.unitValue || 5) + '" style="width:100%;padding:6px;background:#0f1320;color:#eee;border:1px solid #444;border-radius:6px;font-size:1em">' +
+      '</label>' +
+      '<label style="display:block;margin:8px 0">Real starting bankroll ($) — for P&amp;L tracking:<br>' +
+        '<input id="pnl-br" type="number" min="0" step="0.01" value="' + (pnl.startBankroll || '') + '" placeholder="leave blank to use 4-spin min" style="width:100%;padding:6px;background:#0f1320;color:#eee;border:1px solid #d4af37;border-radius:6px;font-size:1em">' +
       '</label>' +
       '<div id="pnl-calc" style="margin:10px 0;padding:8px;background:#0f1320;border-radius:6px;font-size:.9em;line-height:1.5"></div>' +
       '<div id="pnl-warn" style="color:#ff9a3c;font-size:.85em;margin:6px 0;display:none"></div>' +
@@ -154,11 +170,15 @@
         pnl.unitCount = uc;
         pnl.unitValue = uv;
       } else {
+        var brInput = document.getElementById('pnl-br');
+        var realBR = brInput ? parseFloat(brInput.value) : NaN;
+        if (!isFinite(realBR) || realBR <= 0) realBR = minBR;
         pnl.active = true;
         pnl.element = el;
         pnl.unitCount = uc;
         pnl.unitValue = uv;
-        pnl.startBankroll = minBR;        // 4-spin minimum, hard rule
+        pnl.startBankroll = realBR;       // actual bankroll entered by user (or 4-spin min fallback)
+        pnl.sessionMin = minBR;           // suggested minimum for reference
         pnl.startSpinCount = (typeof window._lfGetSpinCount === 'function') ? window._lfGetSpinCount() : 0;
         pnl.netPL = 0;
         pnl.spinsPlayed = 0;
@@ -233,7 +253,7 @@
     if (!panel) return;
     var rem = remaining();
     var pct = pnl.startBankroll ? (pnl.netPL / pnl.startBankroll * 100) : 0;
-    var plColor = pnl.netPL >= 0 ? '#7fdc7f' : '#ff7373';
+    var plColor = pnl.netPL >= 0 ? '#22ff22' : '#ff3333';
     panel.innerHTML =
       '<span><b style="color:#d4af37">' + EL_NAMES[pnl.element] + '</b></span>' +
       '<span>Bet: <b>' + pnl.unitCount + '×' + fmt(pnl.unitValue) + '</b> (cost ' + fmt(costPerSpin()) + '/spin)</span>' +
@@ -284,7 +304,7 @@
       if (!pnl.active) return;
       var td = document.createElement('td');
       td.className = 'pnl-c sn';
-      td.style.cssText = 'font-size:.7em;text-align:center;padding:1px 2px;font-variant-numeric:tabular-nums;line-height:1.1';
+      td.style.cssText = 'font-size:.85em;font-weight:700;text-align:center;padding:2px 3px;font-variant-numeric:tabular-nums;line-height:1.15;background:rgba(0,0,0,.25)';
       var rowNum = idx + 1;
       var entry = pnl.history.find(function (h) { return h.spinIdx === rowNum; });
       if (entry) {
@@ -293,13 +313,13 @@
         var payout = (typeof entry.payout === 'number') ? entry.payout : (isWin ? (entry.delta + 15 * pnl.unitCount * pnl.unitValue) : 0);
         if (isWin) {
           td.innerHTML =
-            '<span style="color:#7fdc7f">' + fmt(payout) + '</span>' +
-            '<br><span style="color:#7fdc7f;font-size:.85em">+' + fmt(entry.delta) + '</span>';
+            '<span style="color:#22ff22;text-shadow:0 0 2px #0a0">' + fmt(payout) + '</span>' +
+            '<br><span style="color:#22ff22;font-size:.9em;text-shadow:0 0 2px #0a0">+' + fmt(entry.delta) + '</span>';
         } else {
           // Miss: $0 payout on top, actual loss (-$X) on bottom.
           td.innerHTML =
-            '<span style="color:#888">$0</span>' +
-            '<br><span style="color:#ff7373;font-size:.85em">' + fmt(entry.delta) + '</span>';
+            '<span style="color:#bbb">$0</span>' +
+            '<br><span style="color:#ff3333;font-size:.9em;text-shadow:0 0 2px #600">' + fmt(entry.delta) + '</span>';
         }
       } else {
         td.textContent = '';
@@ -350,7 +370,7 @@
     window._lfPnlRefreshHooked = true;
     window.refreshAll = function () {
       var res = orig.apply(this, arguments);
-      try { injectColumn(); } catch (e) {}
+      try { resyncPL(); refreshStatsPanel(); injectColumn(); } catch (e) {}
       return res;
     };
     return true;
