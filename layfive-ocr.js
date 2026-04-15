@@ -22,6 +22,29 @@
   var TESS_CDN = 'https://unpkg.com/tesseract.js@5/dist/tesseract.min.js';
   var tessLoading = null;
 
+  // ---------- Claude Vision API config ----------
+  // When enabled, the app calls the /api/ocr-vision route on layfive.com
+  // instead of running Tesseract locally. Much higher accuracy for LED boards.
+  // To enable: paste shared secret into the Photo source picker once; it is
+  // stored in localStorage and reused. Tesseract remains the fallback if the
+  // API call fails or no secret is set.
+  var VISION_URL = 'https://layfive.com/api/ocr-vision';
+  var VISION_LS_SECRET = 'lf_ocr_vision_secret';
+  var VISION_LS_ENABLED = 'lf_ocr_vision_enabled';
+
+  function getVisionSecret() {
+    try { return localStorage.getItem(VISION_LS_SECRET) || ''; } catch (e) { return ''; }
+  }
+  function setVisionSecret(v) {
+    try { localStorage.setItem(VISION_LS_SECRET, v || ''); } catch (e) {}
+  }
+  function isVisionEnabled() {
+    try { return localStorage.getItem(VISION_LS_ENABLED) === '1' && !!getVisionSecret(); } catch (e) { return false; }
+  }
+  function setVisionEnabled(on) {
+    try { localStorage.setItem(VISION_LS_ENABLED, on ? '1' : '0'); } catch (e) {}
+  }
+
   function loadTesseract() {
     if (window.Tesseract) return Promise.resolve(window.Tesseract);
     if (tessLoading) return tessLoading;
@@ -426,8 +449,46 @@
     reader.readAsDataURL(file);
   }
 
+  // Call the layfive.com Vision API. Returns a Promise resolving to an array
+  // of numbers in the order they appear on the board (top to bottom).
+  function callVisionApi(croppedDataUrl) {
+    var secret = getVisionSecret();
+    return fetch(VISION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-OCR-Secret': secret
+      },
+      body: JSON.stringify({ image: croppedDataUrl })
+    }).then(function (res) {
+      if (!res.ok) {
+        return res.text().then(function (t) { throw new Error('Vision API ' + res.status + ': ' + t.slice(0, 200)); });
+      }
+      return res.json();
+    }).then(function (j) {
+      return Array.isArray(j.numbers) ? j.numbers : [];
+    });
+  }
+
   function runOcrPipeline(croppedDataUrl) {
       openOverlay();
+      if (isVisionEnabled()) {
+        showStatus('Calling Claude Vision...');
+        callVisionApi(croppedDataUrl).then(function (nums) {
+          // Pass the original crop as both "photo" and "what was seen" — no
+          // preprocessing was applied since Vision reads the raw image.
+          showConfirmModal(nums, croppedDataUrl, null);
+        }).catch(function (err) {
+          console.warn('[ocr] Vision failed, falling back to Tesseract', err);
+          showStatus('Vision failed, trying local OCR...');
+          setTimeout(function () { runTesseractPipeline(croppedDataUrl); }, 400);
+        });
+      } else {
+        runTesseractPipeline(croppedDataUrl);
+      }
+  }
+
+  function runTesseractPipeline(croppedDataUrl) {
       showStatus('Preparing image...');
       var processedDataUrl = null;
       preprocessImage(croppedDataUrl).then(function (result) {
@@ -436,9 +497,6 @@
         return loadTesseract();
       }).then(function (Tesseract) {
         showStatus('Reading board...', 0);
-        // PSM 6 = single uniform block of text. Good for scoreboards where
-        // numbers are in a single column/row and the rest is noise.
-        // Also try PSM 11 (sparse text) as a fallback.
         return Tesseract.recognize(processedDataUrl, 'eng', {
           logger: function (m) {
             if (m && m.status === 'recognizing text') {
@@ -454,8 +512,6 @@
       }).then(function (result) {
         var text = (result && result.data && result.data.text) || '';
         var nums = parseNumbers(text);
-        // Pass BOTH images to the confirm modal: the original crop (what the
-        // player sees) and the processed B&W (what Tesseract saw).
         showConfirmModal(nums, croppedDataUrl, processedDataUrl);
       }).catch(function (err) {
         showStatus('Error: ' + (err && err.message ? err.message : err));
@@ -522,11 +578,17 @@
     var overlay = document.createElement('div');
     overlay.id = 'lfocr-source-overlay';
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px';
+    var engineOn = isVisionEnabled();
+    var engineLabel = engineOn ? '🧠 Claude Vision (accurate)' : '⚙️ Tesseract (local, free)';
+    var engineColor = engineOn ? '#2e7d32' : '#555';
     overlay.innerHTML =
       '<div style="background:#1a1f2e;border:2px solid #d4af37;border-radius:12px;padding:16px;max-width:320px;width:100%;color:#eee">' +
         '<h3 style="color:#d4af37;text-align:center;margin:0 0 10px">Photo source</h3>' +
         '<button id="lfocr-src-cam" style="width:100%;padding:12px;margin-bottom:8px;background:#2e7d32;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:1em">📷 Take a new photo</button>' +
         '<button id="lfocr-src-lib" style="width:100%;padding:12px;margin-bottom:8px;background:#2a4a7a;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:1em">🖼️ Upload from gallery</button>' +
+        '<div style="margin:10px 0 6px;font-size:.8em;color:#aaa;text-align:center">OCR engine:</div>' +
+        '<button id="lfocr-engine-btn" style="width:100%;padding:8px;margin-bottom:6px;background:' + engineColor + ';color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:.9em">' + engineLabel + '</button>' +
+        '<button id="lfocr-engine-setup" style="width:100%;padding:6px;margin-bottom:8px;background:#333;color:#bbb;border:none;border-radius:6px;cursor:pointer;font-size:.8em">Vision setup</button>' +
         '<button id="lfocr-src-cancel" style="width:100%;padding:8px;background:#444;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer">Cancel</button>' +
       '</div>';
     document.body.appendChild(overlay);
@@ -539,6 +601,24 @@
       overlay.remove();
       var fi = document.getElementById('lfocr-file-lib');
       if (fi) fi.click();
+    };
+    document.getElementById('lfocr-engine-btn').onclick = function () {
+      if (!getVisionSecret()) {
+        alert('Tap "Vision setup" first to paste your shared secret.');
+        return;
+      }
+      setVisionEnabled(!isVisionEnabled());
+      overlay.remove();
+      showSourcePicker();
+    };
+    document.getElementById('lfocr-engine-setup').onclick = function () {
+      var cur = getVisionSecret();
+      var v = prompt('Paste your OCR shared secret (from Vercel env OCR_SHARED_SECRET):', cur);
+      if (v === null) return; // cancelled
+      setVisionSecret(v.trim());
+      if (v.trim()) setVisionEnabled(true);
+      overlay.remove();
+      showSourcePicker();
     };
     document.getElementById('lfocr-src-cancel').onclick = function () { overlay.remove(); };
   }
