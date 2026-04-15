@@ -35,6 +35,70 @@
     return tessLoading;
   }
 
+  // ---------- Image preprocessing ----------
+  // Improves OCR accuracy on LED scoreboards by:
+  //   1. upscaling 2x so digits have more pixels
+  //   2. converting to grayscale
+  //   3. auto-inverting if the image is bright text on dark background
+  //   4. stretching contrast to full range
+  //   5. hard-thresholding to pure black/white
+  // Returns a Promise that resolves with a data URL of the processed image.
+  function preprocessImage(srcDataUrl) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      img.onload = function () {
+        try {
+          var scale = 2;
+          var w = img.naturalWidth * scale;
+          var h = img.naturalHeight * scale;
+          // Cap max dimension to avoid blowing up memory on huge photos.
+          var MAX = 2400;
+          if (w > MAX || h > MAX) {
+            var r = Math.min(MAX / w, MAX / h);
+            w = Math.round(w * r); h = Math.round(h * r);
+          }
+          var c = document.createElement('canvas');
+          c.width = w; c.height = h;
+          var ctx = c.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          var imageData = ctx.getImageData(0, 0, w, h);
+          var d = imageData.data;
+          // Pass 1: grayscale + compute mean brightness.
+          var sum = 0;
+          var N = d.length / 4;
+          for (var i = 0; i < d.length; i += 4) {
+            var g = Math.round(0.299 * d[i] + 0.587 * d[i+1] + 0.114 * d[i+2]);
+            d[i] = g; d[i+1] = g; d[i+2] = g;
+            sum += g;
+          }
+          var mean = sum / N;
+          // Auto-invert: if image is dark (LED on black bg), invert so text is dark on light.
+          var invert = mean < 128;
+          // Pass 2: find min/max for contrast stretch.
+          var lo = 255, hi = 0;
+          for (var j = 0; j < d.length; j += 4) {
+            var v = invert ? (255 - d[j]) : d[j];
+            if (v < lo) lo = v;
+            if (v > hi) hi = v;
+          }
+          var range = Math.max(1, hi - lo);
+          // Pass 3: stretch + threshold at mid-tone.
+          var threshold = 140;
+          for (var k = 0; k < d.length; k += 4) {
+            var src = invert ? (255 - d[k]) : d[k];
+            var stretched = Math.round(((src - lo) / range) * 255);
+            var bw = stretched > threshold ? 255 : 0;
+            d[k] = bw; d[k+1] = bw; d[k+2] = bw;
+          }
+          ctx.putImageData(imageData, 0, 0);
+          resolve({ dataUrl: c.toDataURL('image/png'), inverted: invert });
+        } catch (e) { reject(e); }
+      };
+      img.onerror = function () { reject(new Error('Image load failed')); };
+      img.src = srcDataUrl;
+    });
+  }
+
   // Extract numbers 0-36 from raw OCR text.
   // Strategy: split into lines, from each line pull the first 1-2 digit
   // token that parses as 0-36. Preserves order as read.
@@ -187,12 +251,20 @@
     if (!file) return;
     var reader = new FileReader();
     reader.onload = function () {
-      var dataUrl = reader.result;
+      var origDataUrl = reader.result;
       openOverlay();
-      showStatus('Loading OCR engine...');
-      loadTesseract().then(function (Tesseract) {
+      showStatus('Preparing image...');
+      var processedDataUrl = null;
+      preprocessImage(origDataUrl).then(function (result) {
+        processedDataUrl = result.dataUrl;
+        showStatus('Loading OCR engine...');
+        return loadTesseract();
+      }).then(function (Tesseract) {
         showStatus('Reading board...', 0);
-        return Tesseract.recognize(dataUrl, 'eng', {
+        // PSM 6 = single uniform block of text. Good for scoreboards where
+        // numbers are in a single column/row and the rest is noise.
+        // Also try PSM 11 (sparse text) as a fallback.
+        return Tesseract.recognize(processedDataUrl, 'eng', {
           logger: function (m) {
             if (m && m.status === 'recognizing text') {
               showStatus('Reading board...', m.progress);
@@ -201,11 +273,15 @@
             }
           },
           tessedit_char_whitelist: '0123456789',
+          tessedit_pageseg_mode: '6',
+          preserve_interword_spaces: '1',
         });
       }).then(function (result) {
         var text = (result && result.data && result.data.text) || '';
         var nums = parseNumbers(text);
-        showConfirmModal(nums, dataUrl);
+        // Show the PROCESSED image in the confirm modal so Kenny can see
+        // what Tesseract actually looked at — easier to diagnose misses.
+        showConfirmModal(nums, processedDataUrl || origDataUrl);
       }).catch(function (err) {
         showStatus('Error: ' + (err && err.message ? err.message : err));
         console.error('[ocr] failed', err);
