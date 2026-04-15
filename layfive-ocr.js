@@ -321,15 +321,6 @@
     var overlay = document.createElement('div');
     overlay.id = 'lfocr-confirm-overlay';
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:10000;display:flex;align-items:stretch;justify-content:center;padding:8px;overflow-y:auto';
-    var rowsHtml = numbers.map(function (n, i) {
-      return (
-        '<div class="lfocr-row" data-idx="' + i + '" style="display:flex;gap:4px;align-items:center;margin:2px 0">' +
-          '<span style="width:26px;color:#888;font-size:.75em;text-align:right">#' + (i + 1) + '</span>' +
-          '<input type="number" min="0" max="36" step="1" value="' + n + '" class="lfocr-cell" style="flex:1;padding:4px;background:#0f1320;color:#eee;border:1px solid #444;border-radius:4px;font-size:1.1em;text-align:center;font-weight:700">' +
-          '<button class="lfocr-row-del" title="Remove" style="background:#6b2020;color:#fff;border:none;border-radius:4px;padding:3px 7px;cursor:pointer">✕</button>' +
-        '</div>'
-      );
-    }).join('');
     // Side-by-side layout: photo on left, number list on right (on wider screens).
     // On phones (<600px), it stacks vertically with photo on top.
     var photoBlock = imageDataUrl ? (
@@ -345,17 +336,15 @@
     var listBlock =
       '<div style="flex:1 1 45%;min-width:160px;display:flex;flex-direction:column">' +
         '<div style="color:#d4af37;font-size:.75em;text-align:center;margin-bottom:4px">Captured numbers</div>' +
-        '<div id="lfocr-rows" style="flex:1;min-height:100px;max-height:55vh;overflow-y:auto;border:1px solid #333;border-radius:6px;padding:6px;background:#0f1320">' +
-          (numbers.length ? rowsHtml : '<div style="color:#888;text-align:center;padding:12px">No numbers detected. Use + Add row.</div>') +
-        '</div>' +
-        '<button id="lfocr-add-row" style="width:100%;margin-top:4px;padding:5px;background:#2a4a7a;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.9em">+ Add row</button>' +
+        '<div id="lfocr-rows" style="flex:1;min-height:100px;max-height:55vh;overflow-y:auto;border:1px solid #333;border-radius:6px;padding:6px;background:#0f1320"></div>' +
+        '<button id="lfocr-add-row" style="width:100%;margin-top:4px;padding:5px;background:#2a4a7a;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.9em">+ Add row at end</button>' +
       '</div>';
 
     overlay.innerHTML =
       '<div style="background:#1a1f2e;border:2px solid #d4af37;border-radius:12px;padding:12px;max-width:700px;width:100%;color:#eee;display:flex;flex-direction:column;margin:auto">' +
         '<h3 style="color:#d4af37;text-align:center;margin:0 0 4px;font-size:1.05em">Confirm imported numbers</h3>' +
         '<div style="font-size:.78em;color:#aaa;text-align:center;margin-bottom:8px">' +
-          'Compare the photo against the captured list. Edit, remove, or add numbers as needed.' +
+          'Use ↑↓ to reorder, ✕ to delete, or tap a + bar to insert a missing number.' +
         '</div>' +
         '<div style="background:#0f1320;border:1px solid #333;border-radius:6px;padding:6px 8px;margin-bottom:8px;font-size:.82em">' +
           '<div style="color:#d4af37;margin-bottom:4px">List order in photo:</div>' +
@@ -377,34 +366,118 @@
       '</div>';
     document.body.appendChild(overlay);
 
-    function rebindDeletes() {
-      var dels = overlay.querySelectorAll('.lfocr-row-del');
-      dels.forEach(function (btn) {
+    var rowsContainer = document.getElementById('lfocr-rows');
+
+    function buildRow(value) {
+      var row = document.createElement('div');
+      row.className = 'lfocr-row';
+      row.style.cssText = 'display:flex;gap:3px;align-items:center;margin:2px 0';
+      row.innerHTML =
+        '<span class="lfocr-num" style="width:26px;color:#888;font-size:.72em;text-align:right">#</span>' +
+        '<input type="number" min="0" max="36" step="1" value="' + value + '" class="lfocr-cell" style="flex:1;min-width:0;padding:4px;background:#0f1320;color:#eee;border:1px solid #444;border-radius:4px;font-size:1.05em;text-align:center;font-weight:700">' +
+        '<button class="lfocr-row-up" title="Move up" style="background:#2a4a7a;color:#fff;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:.85em">↑</button>' +
+        '<button class="lfocr-row-down" title="Move down" style="background:#2a4a7a;color:#fff;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:.85em">↓</button>' +
+        '<button class="lfocr-row-del" title="Remove" style="background:#6b2020;color:#fff;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:.85em">✕</button>';
+      return row;
+    }
+
+    function buildInsertBar() {
+      var bar = document.createElement('div');
+      bar.className = 'lfocr-insert';
+      bar.style.cssText = 'display:flex;justify-content:center;margin:1px 0';
+      bar.innerHTML = '<button class="lfocr-insert-btn" title="Insert a missing number here" style="background:transparent;color:#888;border:1px dashed #444;border-radius:4px;padding:1px 14px;cursor:pointer;font-size:.72em">+ insert</button>';
+      return bar;
+    }
+
+    function renumberRows() {
+      var rows = rowsContainer.querySelectorAll('.lfocr-row');
+      rows.forEach(function (r, i) {
+        var nm = r.querySelector('.lfocr-num');
+        if (nm) nm.textContent = '#' + (i + 1);
+      });
+    }
+
+    // Rebuild insert bars so there's exactly one above each row + one at the bottom.
+    function rebuildInsertBars() {
+      // Remove existing bars
+      rowsContainer.querySelectorAll('.lfocr-insert').forEach(function (b) { b.remove(); });
+      var rows = Array.prototype.slice.call(rowsContainer.querySelectorAll('.lfocr-row'));
+      rows.forEach(function (row) {
+        rowsContainer.insertBefore(buildInsertBar(), row);
+      });
+      // Trailing bar (so user can also insert at the very end)
+      rowsContainer.appendChild(buildInsertBar());
+    }
+
+    function bindHandlers() {
+      rowsContainer.querySelectorAll('.lfocr-row-del').forEach(function (btn) {
         btn.onclick = function () {
-          var row = btn.parentElement;
-          if (row) row.remove();
+          var row = btn.closest('.lfocr-row');
+          if (!row) return;
+          row.remove();
+          rebuildInsertBars();
+          renumberRows();
+          bindHandlers();
+        };
+      });
+      rowsContainer.querySelectorAll('.lfocr-row-up').forEach(function (btn) {
+        btn.onclick = function () {
+          var row = btn.closest('.lfocr-row');
+          if (!row) return;
+          var rows = Array.prototype.slice.call(rowsContainer.querySelectorAll('.lfocr-row'));
+          var idx = rows.indexOf(row);
+          if (idx <= 0) return;
+          rowsContainer.insertBefore(row, rows[idx - 1]);
+          rebuildInsertBars();
+          renumberRows();
+          bindHandlers();
+        };
+      });
+      rowsContainer.querySelectorAll('.lfocr-row-down').forEach(function (btn) {
+        btn.onclick = function () {
+          var row = btn.closest('.lfocr-row');
+          if (!row) return;
+          var rows = Array.prototype.slice.call(rowsContainer.querySelectorAll('.lfocr-row'));
+          var idx = rows.indexOf(row);
+          if (idx < 0 || idx >= rows.length - 1) return;
+          rowsContainer.insertBefore(rows[idx + 1], row);
+          rebuildInsertBars();
+          renumberRows();
+          bindHandlers();
+        };
+      });
+      rowsContainer.querySelectorAll('.lfocr-insert-btn').forEach(function (btn) {
+        btn.onclick = function () {
+          var bar = btn.closest('.lfocr-insert');
+          if (!bar) return;
+          var newRow = buildRow(0);
+          rowsContainer.insertBefore(newRow, bar.nextSibling);
+          rebuildInsertBars();
+          renumberRows();
+          bindHandlers();
+          var inp = newRow.querySelector('input');
+          if (inp) { inp.focus(); inp.select(); }
         };
       });
     }
-    rebindDeletes();
+
+    // Initial population
+    rowsContainer.innerHTML = '';
+    numbers.forEach(function (n) {
+      rowsContainer.appendChild(buildRow(n));
+    });
+    rebuildInsertBars();
+    renumberRows();
+    bindHandlers();
 
     document.getElementById('lfocr-add-row').onclick = function () {
-      var container = document.getElementById('lfocr-rows');
-      if (!container) return;
-      var idx = container.querySelectorAll('.lfocr-row').length;
-      var row = document.createElement('div');
-      row.className = 'lfocr-row';
-      row.style.cssText = 'display:flex;gap:6px;align-items:center;margin:3px 0';
-      row.innerHTML =
-        '<span style="width:30px;color:#888;font-size:.8em;text-align:right">#' + (idx + 1) + '</span>' +
-        '<input type="number" min="0" max="36" step="1" value="0" class="lfocr-cell" style="flex:1;padding:6px;background:#0f1320;color:#eee;border:1px solid #444;border-radius:4px;font-size:1em;text-align:center">' +
-        '<button class="lfocr-row-del" title="Remove" style="background:#6b2020;color:#fff;border:none;border-radius:4px;padding:4px 8px;cursor:pointer">✕</button>';
-      // Remove the "no numbers" placeholder if present
-      var placeholder = container.querySelector('div[style*="No numbers"]');
-      if (placeholder) placeholder.remove();
-      container.appendChild(row);
-      rebindDeletes();
-      row.querySelector('input').focus();
+      var newRow = buildRow(0);
+      rowsContainer.appendChild(newRow);
+      rebuildInsertBars();
+      renumberRows();
+      bindHandlers();
+      var inp = newRow.querySelector('input');
+      if (inp) inp.focus();
     };
 
     document.getElementById('lfocr-confirm-cancel').onclick = closeAllOcr;
