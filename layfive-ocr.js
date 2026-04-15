@@ -69,7 +69,7 @@
   }
 
   function closeAllOcr() {
-    var ids = ['lfocr-overlay', 'lfocr-confirm-overlay'];
+    var ids = ['lfocr-overlay', 'lfocr-confirm-overlay', 'lfocr-source-overlay'];
     ids.forEach(function (id) { var el = document.getElementById(id); if (el) el.remove(); });
   }
 
@@ -219,33 +219,79 @@
     var pane = document.getElementById('p0');
     if (!pane) return false;
     if (document.getElementById('lfocr-btn')) return true;
-    // Place into the same .actions row as Undo so it shares the sticky strip.
     var actions = pane.querySelector('.actions');
     if (!actions) return false;
+    // Ensure the row wraps so new buttons never overflow off-screen on phones.
+    actions.style.flexWrap = 'wrap';
     var btn = document.createElement('button');
     btn.id = 'lfocr-btn';
     btn.type = 'button';
     btn.title = 'Import numbers from a scoreboard photo';
     btn.textContent = '📷 Photo';
-    btn.style.cssText = 'background:#3a5a8a;color:#fff;border:1px solid #6a8acc;border-radius:6px;padding:4px 10px;font-size:.9em;cursor:pointer;margin-left:6px';
+    // Bright, highly visible so it's hard to miss. Also prepended so it shows first.
+    btn.style.cssText = 'background:linear-gradient(135deg,#f5a623,#d48506);color:#000;border:1px solid #ffc567;border-radius:6px;padding:6px 10px;font-weight:700;font-size:.9em;cursor:pointer';
     btn.onclick = function () {
       var fi = document.getElementById('lfocr-file');
       if (fi) fi.click();
     };
-    var fi = document.createElement('input');
-    fi.type = 'file';
-    fi.accept = 'image/*';
-    fi.capture = 'environment';
-    fi.id = 'lfocr-file';
-    fi.style.display = 'none';
-    fi.onchange = function (e) {
+    // Two hidden file inputs: one for camera, one for gallery. The button
+    // opens a small picker so Kenny can choose between taking a new photo
+    // and uploading from his photo library.
+    var fiCam = document.createElement('input');
+    fiCam.type = 'file';
+    fiCam.accept = 'image/*';
+    fiCam.capture = 'environment';
+    fiCam.id = 'lfocr-file-cam';
+    fiCam.style.display = 'none';
+    fiCam.onchange = function (e) {
       var f = e.target.files && e.target.files[0];
       if (f) handleFile(f);
-      e.target.value = ''; // allow re-select same file
+      e.target.value = '';
     };
-    actions.appendChild(btn);
-    actions.appendChild(fi);
+    var fiLib = document.createElement('input');
+    fiLib.type = 'file';
+    fiLib.accept = 'image/*';
+    fiLib.id = 'lfocr-file-lib';
+    fiLib.style.display = 'none';
+    fiLib.onchange = function (e) {
+      var f = e.target.files && e.target.files[0];
+      if (f) handleFile(f);
+      e.target.value = '';
+    };
+    btn.onclick = showSourcePicker;
+    // Prepend so it appears first in the row (most visible spot on phone).
+    if (actions.firstChild) actions.insertBefore(btn, actions.firstChild);
+    else actions.appendChild(btn);
+    actions.appendChild(fiCam);
+    actions.appendChild(fiLib);
     return true;
+  }
+
+  // Small modal letting the user choose camera vs gallery for the photo source.
+  function showSourcePicker() {
+    closeAllOcr();
+    var overlay = document.createElement('div');
+    overlay.id = 'lfocr-source-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px';
+    overlay.innerHTML =
+      '<div style="background:#1a1f2e;border:2px solid #d4af37;border-radius:12px;padding:16px;max-width:320px;width:100%;color:#eee">' +
+        '<h3 style="color:#d4af37;text-align:center;margin:0 0 10px">Photo source</h3>' +
+        '<button id="lfocr-src-cam" style="width:100%;padding:12px;margin-bottom:8px;background:#2e7d32;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:1em">📷 Take a new photo</button>' +
+        '<button id="lfocr-src-lib" style="width:100%;padding:12px;margin-bottom:8px;background:#2a4a7a;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:1em">🖼️ Upload from gallery</button>' +
+        '<button id="lfocr-src-cancel" style="width:100%;padding:8px;background:#444;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer">Cancel</button>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    document.getElementById('lfocr-src-cam').onclick = function () {
+      overlay.remove();
+      var fi = document.getElementById('lfocr-file-cam');
+      if (fi) fi.click();
+    };
+    document.getElementById('lfocr-src-lib').onclick = function () {
+      overlay.remove();
+      var fi = document.getElementById('lfocr-file-lib');
+      if (fi) fi.click();
+    };
+    document.getElementById('lfocr-src-cancel').onclick = function () { overlay.remove(); };
   }
 
   function tryInstall() {
