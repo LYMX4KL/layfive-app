@@ -656,7 +656,14 @@
     var engineColor = engineOn ? '#2e7d32' : '#555';
     overlay.innerHTML =
       '<div style="background:#1a1f2e;border:2px solid #d4af37;border-radius:12px;padding:16px;max-width:320px;width:100%;color:#eee">' +
-        '<h3 style="color:#d4af37;text-align:center;margin:0 0 10px">Photo source</h3>' +
+        '<h3 style="color:#d4af37;text-align:center;margin:0 0 8px">Photo source</h3>' +
+        '<div style="background:#0f1320;border:1px solid #333;border-radius:6px;padding:6px 8px;margin-bottom:10px;font-size:.75em;color:#bbb;line-height:1.35">' +
+          '<div style="color:#d4af37;font-weight:700;margin-bottom:3px">📸 For best results:</div>' +
+          '• Stand <b>close</b> — fill the frame with just the numbers column<br>' +
+          '• Shoot <b>straight-on</b>, not at an angle<br>' +
+          '• Avoid glare — tilt phone if you see reflections<br>' +
+          '• Hold <b>steady</b> — tap to focus, then wait a beat' +
+        '</div>' +
         '<button id="lfocr-src-cam" style="width:100%;padding:12px;margin-bottom:8px;background:#2e7d32;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:1em">📷 Take a new photo</button>' +
         '<button id="lfocr-src-lib" style="width:100%;padding:12px;margin-bottom:8px;background:#2a4a7a;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:1em">🖼️ Upload from gallery</button>' +
         '<div style="margin:10px 0 6px;font-size:.8em;color:#aaa;text-align:center">OCR engine:</div>' +
