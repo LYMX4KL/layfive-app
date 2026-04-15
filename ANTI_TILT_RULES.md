@@ -41,7 +41,7 @@ spin that is added to the Scorecard.
 | H2  | Over the most recent 20 spins, net P&L never went positive at any point (back-and-forth).        |
 | H3  | Last-12 window has 2+ co-leaders, OR the selected element lost the lead to a single other element. |
 | H4  | 4 of the 5 elements each had a 4-blank streak in the last 12 spins, AND the remaining element is not the current last-12 leader. |
-| H5  | 2+ non-selected elements are each 2+ spins ahead of the selected element in the last 12 spins. No single clear new leader to switch to — stop. |
+| H5  | 2+ non-selected elements are each 2+ spins ahead of the selected element in the **last 20 spins**. No single clear new leader to switch to — stop. *(Uses a wider 20-spin window than other lead rules to reduce noise.)* |
 
 ## Modal behavior
 

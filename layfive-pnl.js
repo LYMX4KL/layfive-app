@@ -41,7 +41,8 @@
     startSpinCount: 0,   // spins.length when session started (P&L only counts later spins)
     netPL: 0,            // running net P&L
     spinsPlayed: 0,
-    history: []          // [{ spinIdx, num, hitType, delta, runningPL }]
+    skipNext: false,     // when true, the next spin is recorded but not bet on (delta = 0)
+    history: []          // [{ spinIdx, num, hitType, delta, runningPL, skipped? }]
   };
 
   // ---------- helpers ----------
@@ -114,7 +115,7 @@
         '<select id="pnl-el" style="width:100%;padding:6px;background:#0f1320;color:#eee;border:1px solid #444;border-radius:6px;font-size:1em">' + elOpts + '</select>' +
       '</label>' +
       '<label style="display:block;margin:8px 0">Unit count (chips per spot):<br>' +
-        '<input id="pnl-uc" type="number" min="1" step="1" value="' + (pnl.unitCount || 1) + '" style="width:100%;padding:6px;background:#0f1320;color:#eee;border:1px solid #444;border-radius:6px;font-size:1em">' +
+        '<input id="pnl-uc" type="number" min="0" step="1" value="' + (pnl.unitCount || 1) + '" style="width:100%;padding:6px;background:#0f1320;color:#eee;border:1px solid #444;border-radius:6px;font-size:1em" title="Set to 0 to pause betting (track spins only, no P&L impact)">' +
       '</label>' +
       '<label style="display:block;margin:8px 0">Unit value ($):<br>' +
         '<input id="pnl-uv" type="number" min="0.01" step="0.01" value="' + (pnl.unitValue || 5) + '" style="width:100%;padding:6px;background:#0f1320;color:#eee;border:1px solid #444;border-radius:6px;font-size:1em">' +
@@ -163,7 +164,7 @@
       var el = document.getElementById('pnl-el').value;
       var uc = parseInt(document.getElementById('pnl-uc').value, 10) || 0;
       var uv = parseFloat(document.getElementById('pnl-uv').value) || 0;
-      if (!el || uc < 1 || uv <= 0) { alert('Fill in all fields with positive numbers.'); return; }
+      if (!el || uc < 0 || uv <= 0) { alert('Fill in all fields with valid numbers (unit count can be 0 to pause betting).'); return; }
       var perSpin = SPOTS_PER_SPIN * uc * uv;
       var minBR = MIN_BR_MUL * uc * uv;
       if (switching) {
@@ -258,17 +259,32 @@
     var rem = remaining();
     var pct = pnl.startBankroll ? (pnl.netPL / pnl.startBankroll * 100) : 0;
     var plColor = pnl.netPL >= 0 ? '#22ff22' : '#ff3333';
+    var paused = (pnl.unitCount === 0);
+    var betLabel = paused
+      ? '<b style="color:#ff9a3c">PAUSED (0 units)</b>'
+      : '<b>' + pnl.unitCount + '×' + fmt(pnl.unitValue) + '</b> (cost ' + fmt(costPerSpin()) + '/spin)';
+    var skipBtnStyle = pnl.skipNext
+      ? 'background:#ff9a3c;color:#000;border:1px solid #ffc080'
+      : 'background:#3a5a8a;color:#fff;border:1px solid #6a8acc';
+    var skipLabel = pnl.skipNext ? '⏭ Skip armed' : '⏭ Skip next';
     panel.innerHTML =
       '<span><b style="color:#d4af37">' + EL_NAMES[pnl.element] + '</b></span>' +
-      '<span>Bet: <b>' + pnl.unitCount + '×' + fmt(pnl.unitValue) + '</b> (cost ' + fmt(costPerSpin()) + '/spin)</span>' +
+      '<span>Bet: ' + betLabel + '</span>' +
       '<span>Spins: <b>' + pnl.spinsPlayed + '</b></span>' +
       '<span>P&amp;L: <b style="color:' + plColor + '">' + fmt(pnl.netPL) + ' (' + (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%)</b></span>' +
       '<span>Remaining: <b>' + fmt(rem) + '</b> / start ' + fmt(pnl.startBankroll) + '</span>' +
       '<span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">' +
+        '<button id="pnl-skip-btn" style="' + skipBtnStyle + ';border-radius:6px;padding:3px 8px;font-size:.9em;cursor:pointer" title="Record the next spin with no bet (0 P&L). Click again to cancel.">' + skipLabel + '</button>' +
         '<button id="pnl-switch-btn" style="background:#5a3a8a;color:#fff;border:1px solid #8a6acc;border-radius:6px;padding:3px 8px;font-size:.9em;cursor:pointer">Switch</button>' +
         '<button id="pnl-tolog-btn" style="background:#2e7d32;color:#fff;border:1px solid #66bb6a;border-radius:6px;padding:3px 8px;font-size:.9em;cursor:pointer" title="Send this live P&L total to the W/L Log tab">💵 &rarr; W/L Log</button>' +
         '<button id="pnl-end-btn" style="background:#6b0f0f;color:#fff;border:1px solid #c94a4a;border-radius:6px;padding:3px 8px;font-size:.9em;cursor:pointer">End</button>' +
       '</span>';
+    var sk = document.getElementById('pnl-skip-btn');
+    if (sk) sk.onclick = function () {
+      pnl.skipNext = !pnl.skipNext;
+      persist();
+      refreshStatsPanel();
+    };
     var sw = document.getElementById('pnl-switch-btn');
     if (sw) sw.onclick = function () { openSetupModal(true); };
     var tl = document.getElementById('pnl-tolog-btn');
@@ -318,18 +334,25 @@
       var rowNum = idx + 1;
       var entry = pnl.history.find(function (h) { return h.spinIdx === rowNum; });
       if (entry) {
-        // Display: top = payout total this spin, bottom = net profit (+), or "$0 / $0" on miss.
-        var isWin = entry.hitType === 's' || entry.hitType === 'sp';
-        var payout = (typeof entry.payout === 'number') ? entry.payout : (isWin ? (entry.delta + 15 * pnl.unitCount * pnl.unitValue) : 0);
-        if (isWin) {
+        if (entry.skipped) {
+          // Skipped spin: no bet placed, no P&L impact. Show neutral indicator.
           td.innerHTML =
-            '<span style="color:#22ff22;text-shadow:0 0 2px #0a0">' + fmt(payout) + '</span>' +
-            '<br><span style="color:#22ff22;font-size:.9em;text-shadow:0 0 2px #0a0">+' + fmt(entry.delta) + '</span>';
+            '<span style="color:#888">—</span>' +
+            '<br><span style="color:#ff9a3c;font-size:.8em">SKIP</span>';
         } else {
-          // Miss: $0 payout on top, actual loss (-$X) on bottom.
-          td.innerHTML =
-            '<span style="color:#bbb">$0</span>' +
-            '<br><span style="color:#ff3333;font-size:.9em;text-shadow:0 0 2px #600">' + fmt(entry.delta) + '</span>';
+          // Display: top = payout total this spin, bottom = net profit (+), or "$0 / $0" on miss.
+          var isWin = entry.hitType === 's' || entry.hitType === 'sp';
+          var payout = (typeof entry.payout === 'number') ? entry.payout : (isWin ? (entry.delta + 15 * pnl.unitCount * pnl.unitValue) : 0);
+          if (isWin) {
+            td.innerHTML =
+              '<span style="color:#22ff22;text-shadow:0 0 2px #0a0">' + fmt(payout) + '</span>' +
+              '<br><span style="color:#22ff22;font-size:.9em;text-shadow:0 0 2px #0a0">+' + fmt(entry.delta) + '</span>';
+          } else {
+            // Miss: $0 payout on top, actual loss (-$X) on bottom.
+            td.innerHTML =
+              '<span style="color:#bbb">$0</span>' +
+              '<br><span style="color:#ff3333;font-size:.9em;text-shadow:0 0 2px #600">' + fmt(entry.delta) + '</span>';
+          }
         }
       } else {
         td.textContent = '';
@@ -355,10 +378,23 @@
           var spinIdx = afterLen; // 1-based row
           // Determine hit type via the app's hitType function
           var ht = (typeof window.hitType === 'function') ? window.hitType(num, pnl.element) : '-';
-          var delta = netForHit(ht);
+          // Skip logic: if Skip-next armed OR unitCount=0 (paused), record spin with 0 delta.
+          var isSkipped = pnl.skipNext || (pnl.unitCount === 0);
+          var delta = isSkipped ? 0 : netForHit(ht);
+          var payout = isSkipped ? 0 : payoutForHit(ht);
           pnl.netPL += delta;
           pnl.spinsPlayed += 1;
-          pnl.history.push({ spinIdx: spinIdx, num: num, hitType: ht, delta: delta, payout: payoutForHit(ht), runningPL: pnl.netPL });
+          pnl.history.push({
+            spinIdx: spinIdx,
+            num: num,
+            hitType: ht,
+            delta: delta,
+            payout: payout,
+            runningPL: pnl.netPL,
+            skipped: isSkipped
+          });
+          // Consume the one-shot skip flag (but leave unitCount=0 pause persistent).
+          if (pnl.skipNext) pnl.skipNext = false;
           persist();
           refreshStatsPanel();
           // Re-inject immediately so the current spin's P&L shows up now,

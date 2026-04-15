@@ -1,7 +1,7 @@
 /* =========================================================================
  * layfive-rules.js — anti-tilt suggestion / caution / hard-stop engine
  * -------------------------------------------------------------------------
- * Ruleset v2 (2026-04-14). See ANTI_TILT_RULES.md for full spec.
+ * Ruleset v2 (2026-04-14, H5 widened to 20 spins 2026-04-15). See ANTI_TILT_RULES.md for full spec.
  *
  * Runs only when a live P&L session is active (lf_pnl_session_v1 with
  * active:true). After each spin (we hook refreshAll), we evaluate metrics
@@ -172,11 +172,14 @@
              EL_NAMES[sel] + '</b>. Stop.',
       });
     }
-    // H5: 2+ elements each pulled 2+ spins ahead of the selected in the last 12.
+    // H5: 2+ elements each pulled 2+ spins ahead of the selected in the last 20.
     //     No clear single challenger to switch to → stop.
+    //     (Uses a wider 20-spin window than other lead rules to reduce noise.)
+    var last20ForH5 = entries.slice(-20);
+    var lead20H5 = leaderOf(last20ForH5);
     var passers = ELS.filter(function (el) {
       if (el === sel) return false;
-      return lead12.counts[el] - lead12.counts[sel] >= 2;
+      return lead20H5.counts[el] - lead20H5.counts[sel] >= 2;
     });
     if (passers.length >= 2) {
       triggers.push({
@@ -185,7 +188,7 @@
         title: 'Hard stop: multiple elements passed yours',
         msg: passers.map(function (e) { return EL_NAMES[e]; }).join(', ') +
              ' are each 2+ spins ahead of your selected <b>' + EL_NAMES[sel] +
-             '</b> in the last 12 spins. No single clear new leader — stop now.',
+             '</b> in the last 20 spins. No single clear new leader — stop now.',
       });
     }
     // H4: 4 of 5 elements each have 4-blank streaks in last 12, and the 1 remaining isn't the current leader
