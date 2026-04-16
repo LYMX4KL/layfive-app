@@ -629,6 +629,7 @@ button{font-family:inherit}
     <div class="acard">
       <h3 data-i18n="saved_sessions">Saved Sessions</h3>
       <div id="sessList"></div>
+      <button onclick="exportAllData()" style="margin-top:8px;width:100%;padding:10px;background:#2a7fc4;color:#fff;border:none;border-radius:6px;font-weight:700;font-size:.85em;cursor:pointer">📤 Export All Data (JSON)</button>
     </div>
     <div class="acard" id="poolStatsCard" style="display:none">
       <h3 data-i18n="pool_title">Strategy Insights (Per-Session Analysis)</h3>
@@ -2189,6 +2190,28 @@ async function delSess(i){
   sessions.splice(i,1);
   if(!firebaseReady){try{localStorage.setItem('lf_sess',JSON.stringify(sessions))}catch(e){}}
   refreshSessions();
+}
+
+// ===== EXPORT ALL DATA =====
+function exportAllData(){
+  const payload={
+    exportDate:new Date().toISOString(),
+    appVersion:'v9',
+    sessions:sessions,
+    wlEntries:JSON.parse(localStorage.getItem('layfive_wl_entries')||'[]'),
+    pnlSession:(function(){try{return JSON.parse(localStorage.getItem('lf_pnl_session_v1'))}catch(e){return null}})(),
+    customGames:JSON.parse(localStorage.getItem('layfive_custom_games')||'[]')
+  };
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download='layfive_export_'+new Date().toISOString().slice(0,10)+'.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  alert('Exported '+sessions.length+' sessions + W/L entries to JSON file.');
 }
 
 // ===== LOAD SAVED SESSION INTO SCORECARD (READ-ONLY) =====
