@@ -243,11 +243,37 @@
   function setVisionSecret(v) {
     try { localStorage.setItem(VISION_LS_SECRET, v || ''); } catch (e) {}
   }
+
+  // Vision is auto-enabled for logged-in Pro+ users (no secret needed).
+  // Legacy: also enabled if user manually set a shared secret.
   function isVisionEnabled() {
+    // Auto-enable for Pro+ members
+    if (window._lfAuth && window._lfAuth.canAccess && window._lfAuth.canAccess('ocr')) {
+      var user = window._lfAuth.getUser && window._lfAuth.getUser();
+      if (user) return true;
+    }
+    // Legacy fallback: manual shared secret
     try { return localStorage.getItem(VISION_LS_ENABLED) === '1' && !!getVisionSecret(); } catch (e) { return false; }
   }
   function setVisionEnabled(on) {
     try { localStorage.setItem(VISION_LS_ENABLED, on ? '1' : '0'); } catch (e) {}
+  }
+
+  // Get the Supabase access token for authenticated API calls
+  function _getSupabaseToken() {
+    try {
+      var keys = Object.keys(localStorage);
+      for (var i = 0; i < keys.length; i++) {
+        if (keys[i].indexOf('sb-') === 0 && keys[i].indexOf('-auth-token') > 0) {
+          var raw = localStorage.getItem(keys[i]);
+          if (raw) {
+            var parsed = JSON.parse(raw);
+            return parsed.access_token || '';
+          }
+        }
+      }
+    } catch (e) {}
+    return '';
   }
 
   function loadTesseract() {
@@ -795,14 +821,20 @@
   // Call the layfive.com Vision API. Returns a Promise resolving to an array
   // of numbers in the order they appear on the board (top to bottom).
   function callVisionApi(croppedDataUrl) {
-    var secret = getVisionSecret();
     var hints = _learnGetPromptHints(); // Dynamic hints from correction history
+
+    // Auth: use Supabase token for Pro+ users, fall back to legacy shared secret
+    var headers = { 'Content-Type': 'application/json' };
+    var token = _getSupabaseToken();
+    if (token) {
+      headers['Authorization'] = 'Bearer ' + token;
+    } else {
+      headers['X-OCR-Secret'] = getVisionSecret();
+    }
+
     return fetch(VISION_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-OCR-Secret': secret
-      },
+      headers: headers,
       body: JSON.stringify({ image: croppedDataUrl, hints: hints || undefined })
     }).then(function (res) {
       if (!res.ok) {
@@ -926,8 +958,24 @@
     overlay.id = 'lfocr-source-overlay';
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px';
     var engineOn = isVisionEnabled();
+    var isProUser = window._lfAuth && window._lfAuth.canAccess && window._lfAuth.canAccess('ocr') && window._lfAuth.getUser && window._lfAuth.getUser();
     var engineLabel = engineOn ? '🧠 Claude Vision (accurate)' : '⚙️ Tesseract (local, free)';
     var engineColor = engineOn ? '#2e7d32' : '#555';
+
+    // For Pro+ users: show simpler UI (no manual secret setup needed)
+    var engineControls = '';
+    if (isProUser) {
+      // Pro+ user: Vision is auto-enabled, just show status
+      engineControls =
+        '<div style="margin:10px 0 6px;font-size:.8em;color:#2e7d32;text-align:center;font-weight:700">🧠 Claude Vision enabled (Premium member)</div>';
+    } else {
+      // Free/non-logged-in: show engine toggle + legacy setup
+      engineControls =
+        '<div style="margin:10px 0 6px;font-size:.8em;color:#aaa;text-align:center">OCR engine:</div>' +
+        '<button id="lfocr-engine-btn" style="width:100%;padding:8px;margin-bottom:6px;background:' + engineColor + ';color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:.9em">' + engineLabel + '</button>' +
+        '<button id="lfocr-engine-setup" style="width:100%;padding:6px;margin-bottom:8px;background:#333;color:#bbb;border:none;border-radius:6px;cursor:pointer;font-size:.8em">Vision setup</button>';
+    }
+
     overlay.innerHTML =
       '<div style="background:#1a1f2e;border:2px solid #d4af37;border-radius:12px;padding:16px;max-width:320px;width:100%;color:#eee">' +
         '<h3 style="color:#d4af37;text-align:center;margin:0 0 8px">Photo source</h3>' +
@@ -940,9 +988,7 @@
         '</div>' +
         '<button id="lfocr-src-cam" style="width:100%;padding:12px;margin-bottom:8px;background:#2e7d32;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:1em">📷 Take a new photo</button>' +
         '<button id="lfocr-src-lib" style="width:100%;padding:12px;margin-bottom:8px;background:#2a4a7a;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer;font-size:1em">🖼️ Upload from gallery</button>' +
-        '<div style="margin:10px 0 6px;font-size:.8em;color:#aaa;text-align:center">OCR engine:</div>' +
-        '<button id="lfocr-engine-btn" style="width:100%;padding:8px;margin-bottom:6px;background:' + engineColor + ';color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:.9em">' + engineLabel + '</button>' +
-        '<button id="lfocr-engine-setup" style="width:100%;padding:6px;margin-bottom:8px;background:#333;color:#bbb;border:none;border-radius:6px;cursor:pointer;font-size:.8em">Vision setup</button>' +
+        engineControls +
         '<div id="lfocr-learn-stats" style="margin:8px 0;font-size:.75em;color:#888"></div>' +
         '<button id="lfocr-src-cancel" style="width:100%;padding:8px;background:#444;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer">Cancel</button>' +
       '</div>';
@@ -957,24 +1003,31 @@
       var fi = document.getElementById('lfocr-file-lib');
       if (fi) fi.click();
     };
-    document.getElementById('lfocr-engine-btn').onclick = function () {
-      if (!getVisionSecret()) {
-        alert('Tap "Vision setup" first to paste your shared secret.');
-        return;
-      }
-      setVisionEnabled(!isVisionEnabled());
-      overlay.remove();
-      showSourcePicker();
-    };
-    document.getElementById('lfocr-engine-setup').onclick = function () {
-      var cur = getVisionSecret();
-      var v = prompt('Paste your OCR shared secret (from Vercel env OCR_SHARED_SECRET):', cur);
-      if (v === null) return; // cancelled
-      setVisionSecret(v.trim());
-      if (v.trim()) setVisionEnabled(true);
-      overlay.remove();
-      showSourcePicker();
-    };
+    // Engine controls only exist for non-Pro users
+    var engineBtn = document.getElementById('lfocr-engine-btn');
+    var setupBtn = document.getElementById('lfocr-engine-setup');
+    if (engineBtn) {
+      engineBtn.onclick = function () {
+        if (!getVisionSecret()) {
+          alert('Tap "Vision setup" first to paste your shared secret.');
+          return;
+        }
+        setVisionEnabled(!isVisionEnabled());
+        overlay.remove();
+        showSourcePicker();
+      };
+    }
+    if (setupBtn) {
+      setupBtn.onclick = function () {
+        var cur = getVisionSecret();
+        var v = prompt('Paste your OCR shared secret (from Vercel env OCR_SHARED_SECRET):', cur);
+        if (v === null) return; // cancelled
+        setVisionSecret(v.trim());
+        if (v.trim()) setVisionEnabled(true);
+        overlay.remove();
+        showSourcePicker();
+      };
+    }
     document.getElementById('lfocr-src-cancel').onclick = function () { overlay.remove(); };
 
     // Show AI learning stats if any scans have been done

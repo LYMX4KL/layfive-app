@@ -1,15 +1,14 @@
 /*
- * LayFive Auth & Tier Gating (v1)
+ * LayFive Auth & Tier Gating (v2)
  * --------------------------------
- * Adds Supabase authentication check and feature gating to the tracker app.
+ * Adds Supabase authentication and feature gating to the tracker app.
  * Uses Supabase JS client loaded from CDN.
  *
- * Auth flow:
- *   - "Login via layfive.com" button opens website login in new tab
- *   - After login, user returns to tracker; Supabase session cookie is shared
- *     (only works if tracker is served from same domain or uses Supabase token)
- *   - Since tracker is on GitHub Pages (different domain), we use Supabase
- *     client-side auth with stored session tokens.
+ * Auth flow (v2 — direct login):
+ *   - "Login" button opens an in-app email/password modal
+ *   - Authenticates directly with Supabase (same project as the website)
+ *   - Session is stored in tracker's own localStorage — no cross-domain issues
+ *   - "Sign up on layfive.com" link for new users
  *
  * Tier gating:
  *   - Free: scorecard, reference, videos, basic save/load
@@ -89,12 +88,114 @@
     updateUI();
   }
 
-  // ---------- Login redirect ----------
-  function loginRedirect() {
-    // Open layfive.com login page in a new tab
-    // Pass the tracker URL as redirect so user can come back
-    var returnUrl = encodeURIComponent(window.location.href);
-    window.open('https://www.layfive.com/login?redirect=' + returnUrl, '_blank');
+  // ---------- Direct login modal ----------
+  function showLoginModal() {
+    // Remove existing modal if any
+    var existing = document.getElementById('lf-login-overlay');
+    if (existing) existing.remove();
+
+    var overlay = document.createElement('div');
+    overlay.id = 'lf-login-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10000;display:flex;align-items:center;justify-content:center;padding:12px';
+
+    var box = document.createElement('div');
+    box.style.cssText = 'background:#1a1f2e;border:2px solid #d4af37;border-radius:12px;padding:24px;width:100%;max-width:320px;color:#eee';
+    box.innerHTML =
+      '<h3 style="color:#d4af37;margin:0 0 16px;text-align:center">Log In to LayFive</h3>' +
+      '<div style="margin-bottom:12px">' +
+        '<label style="font-size:.8em;color:#aaa;display:block;margin-bottom:4px">Email</label>' +
+        '<input id="lf-login-email" type="email" autocomplete="email" ' +
+          'style="width:100%;padding:10px;background:#0d1117;border:1px solid #444;border-radius:6px;color:#eee;font-size:1em;box-sizing:border-box" />' +
+      '</div>' +
+      '<div style="margin-bottom:16px">' +
+        '<label style="font-size:.8em;color:#aaa;display:block;margin-bottom:4px">Password</label>' +
+        '<input id="lf-login-pass" type="password" autocomplete="current-password" ' +
+          'style="width:100%;padding:10px;background:#0d1117;border:1px solid #444;border-radius:6px;color:#eee;font-size:1em;box-sizing:border-box" />' +
+      '</div>' +
+      '<div id="lf-login-error" style="color:#f87171;font-size:.85em;margin-bottom:10px;display:none"></div>' +
+      '<div style="display:flex;gap:8px">' +
+        '<button id="lf-login-cancel" style="flex:1;padding:10px;background:#444;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer">Cancel</button>' +
+        '<button id="lf-login-submit" style="flex:1;padding:10px;background:#d4af37;color:#000;border:none;border-radius:6px;font-weight:700;cursor:pointer">Log In</button>' +
+      '</div>' +
+      '<p style="text-align:center;margin:14px 0 0;font-size:.8em;color:#888">' +
+        'Don\'t have an account? <a href="https://www.layfive.com/signup" target="_blank" style="color:#d4af37">Sign up on layfive.com</a>' +
+      '</p>';
+
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    var emailInput = document.getElementById('lf-login-email');
+    var passInput = document.getElementById('lf-login-pass');
+    var errorDiv = document.getElementById('lf-login-error');
+    var submitBtn = document.getElementById('lf-login-submit');
+
+    // Focus email field
+    setTimeout(function () { emailInput.focus(); }, 100);
+
+    // Cancel
+    document.getElementById('lf-login-cancel').onclick = function () { overlay.remove(); };
+    overlay.onclick = function (ev) { if (ev.target === overlay) overlay.remove(); };
+
+    // Submit
+    async function doLogin() {
+      var email = emailInput.value.trim();
+      var pass = passInput.value;
+      if (!email || !pass) {
+        errorDiv.textContent = 'Please enter email and password.';
+        errorDiv.style.display = 'block';
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Logging in...';
+      errorDiv.style.display = 'none';
+
+      try {
+        var result = await _supabase.auth.signInWithPassword({
+          email: email,
+          password: pass,
+        });
+
+        if (result.error) {
+          errorDiv.textContent = result.error.message || 'Login failed. Check your credentials.';
+          errorDiv.style.display = 'block';
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Log In';
+          return;
+        }
+
+        // Success — session is now stored in localStorage
+        _user = result.data.user;
+
+        // Fetch tier
+        var profileResult = await _supabase
+          .from('profiles')
+          .select('tier')
+          .eq('id', _user.id)
+          .single();
+        if (profileResult.data && profileResult.data.tier) {
+          _tier = profileResult.data.tier;
+        }
+
+        overlay.remove();
+        updateUI();
+      } catch (e) {
+        errorDiv.textContent = 'Connection error. Please try again.';
+        errorDiv.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Log In';
+      }
+    }
+
+    submitBtn.onclick = doLogin;
+
+    // Enter key submits
+    passInput.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') doLogin();
+    });
+    emailInput.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') passInput.focus();
+    });
   }
 
   // ---------- Logout ----------
@@ -124,7 +225,7 @@
     var box = document.createElement('div');
     box.style.cssText = 'background:#1a1f2e;border:2px solid ' + (required === 'premium' ? '#a78bfa' : '#d4af37') + ';border-radius:12px;padding:20px;width:100%;max-width:320px;color:#eee;text-align:center';
     box.innerHTML =
-      '<div style="font-size:2em;margin-bottom:8px">' + (required === 'premium' ? '👑' : '⭐') + '</div>' +
+      '<div style="font-size:2em;margin-bottom:8px">' + (required === 'premium' ? '\uD83D\uDC51' : '\u2B50') + '</div>' +
       '<h3 style="color:' + (required === 'premium' ? '#a78bfa' : '#d4af37') + ';margin:0 0 10px">' + tierName + ' Feature</h3>' +
       '<p style="font-size:.9em;line-height:1.5;margin:0 0 14px;color:#ccc">' +
         'This feature requires a <b>' + tierName + '</b> membership. ' +
@@ -133,7 +234,7 @@
       '<div style="display:flex;gap:8px">' +
         '<button id="tg-close" style="flex:1;padding:10px;background:#444;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer">Close</button>' +
         '<button id="tg-upgrade" style="flex:1;padding:10px;background:' + (required === 'premium' ? '#a78bfa' : '#d4af37') + ';color:#000;border:none;border-radius:6px;font-weight:700;cursor:pointer">' +
-          (_user ? 'Upgrade' : 'Sign Up') +
+          (_user ? 'Upgrade' : 'Log In') +
         '</button>' +
       '</div>';
 
@@ -143,7 +244,11 @@
     document.getElementById('tg-close').onclick = function () { overlay.remove(); };
     document.getElementById('tg-upgrade').onclick = function () {
       overlay.remove();
-      window.open('https://www.layfive.com/pricing', '_blank');
+      if (_user) {
+        window.open('https://www.layfive.com/pricing', '_blank');
+      } else {
+        showLoginModal();
+      }
     };
     overlay.onclick = function (ev) { if (ev.target === overlay) overlay.remove(); };
   }
@@ -177,8 +282,8 @@
       badge.title = _user.email + ' (' + tierLabel + ')';
     } else {
       badge.innerHTML = '<span style="color:#d4af37;font-size:.8em;font-weight:700;cursor:pointer">Login</span>';
-      badge.onclick = loginRedirect;
-      badge.title = 'Log in via layfive.com';
+      badge.onclick = showLoginModal;
+      badge.title = 'Log in with your layfive.com account';
     }
 
     // Show/hide element selector based on tier
@@ -196,7 +301,7 @@
     canAccess: canAccess,
     gateFeature: gateFeature,
     showUpgradePrompt: showUpgradePrompt,
-    loginRedirect: loginRedirect,
+    showLoginModal: showLoginModal,
     logout: logout,
     checkSession: checkSession,
   };
