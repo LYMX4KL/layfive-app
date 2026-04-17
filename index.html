@@ -595,31 +595,36 @@ button{font-family:inherit}
 <!-- ==================== ANALYSIS TAB ==================== -->
 <div class="pane" id="p2">
   <div class="apanel">
+    <!-- Data source banner -->
+    <div id="aSourceBanner" style="font-size:.78em;color:var(--dim);padding:4px 8px;margin-bottom:6px;text-align:center"></div>
+
+    <!-- 1. Element Hit Summary -->
     <div class="acard">
-      <h3 data-i18n="hit_summary">Element Hit Summary</h3>
-      <div style="font-size:.85em;color:var(--dim);margin-bottom:5px"><span id="aTotalSpins">0</span> <span data-i18n="spins">spins</span></div>
+      <h3>Element Hit Summary</h3>
+      <div style="font-size:.85em;color:var(--dim);margin-bottom:5px"><span id="aTotalSessions">0</span> sessions · <span id="aTotalSpins">0</span> spins</div>
       <div class="ebox" id="aBoxes"></div>
       <div id="aBars"></div>
     </div>
+
+    <!-- 2. Straight vs Split Gap -->
     <div class="acard">
-      <h3 data-i18n="behind_analysis">Behind-Element Analysis</h3>
-      <p style="font-size:.75em;color:var(--dim);margin-bottom:5px" data-i18n="behind_desc">Elements below expected %. Straight behind more than splits → catch-up likely.</p>
-      <div id="aBehind"></div>
+      <h3>Straight vs Split Gap</h3>
+      <p style="font-size:.75em;color:var(--dim);margin-bottom:5px">Compare actual S/Sp % vs expected. Straight behind = higher profit catch-up potential (+21u vs +3u).</p>
+      <div id="aGap"></div>
     </div>
-    <div id="aRec" class="rec rec-go" style="display:none"></div>
+
+    <!-- 3. Cold Element Recovery -->
     <div class="acard">
-      <h3 data-i18n="svs_title">Straight vs Split Breakdown</h3>
-      <div id="aSvS"></div>
+      <h3>Cold Element Recovery</h3>
+      <p style="font-size:.75em;color:var(--dim);margin-bottom:5px">When an element misses 4+ AND is last place for 3+ spins: how many spins to catch up?</p>
+      <div id="aColdRecovery"></div>
     </div>
+
+    <!-- 4. Leader Profitability After Suggestion -->
     <div class="acard">
-      <h3 data-i18n="conv_title">Spins to Converge (within 5% of expected)</h3>
-      <div id="aConv"></div>
-    </div>
-    <!-- Session End Recommendation -->
-    <div class="end-rec" id="endRec" style="display:none">
-      <h3 data-i18n="end_rec_title">Session Recommendation</h3>
-      <div class="verdict" id="endVerdict"></div>
-      <div id="endReasons"></div>
+      <h3>Leader Profitability</h3>
+      <p style="font-size:.75em;color:var(--dim);margin-bottom:5px">After an element gets lead ≥ 2 (★ suggestion): how many spins profitable? Units W/L tracking.</p>
+      <div id="aLeaderProfit"></div>
     </div>
   </div>
 </div>
@@ -2097,24 +2102,50 @@ function refreshBehindBanner(){
 }
 
 // ===== ANALYSIS =====
+// ===== ANALYSIS TAB (v3.1 — 4 metrics from pooled data) =====
+// Data source: all saved sessions (Firebase pool + local). Analyzes spin arrays.
+function _aGetAllSpinsPooled(){
+  // Gather all spin arrays from saved sessions
+  const allSessions=sessions.filter(s=>s.spins&&s.spins.length>=12);
+  return allSessions;
+}
+
 function refreshAnalysis(){
-  const n=spins.length;
+  const pooled=_aGetAllSpinsPooled();
+  const nSess=pooled.length;
+  // Flatten all spins for aggregate stats
+  let allSpins=[];
+  pooled.forEach(s=>{allSpins=allSpins.concat(s.spins)});
+  const n=allSpins.length;
+
+  document.getElementById('aTotalSessions').textContent=nSess;
   document.getElementById('aTotalSpins').textContent=n;
-  if(!n){
-    document.getElementById('aBoxes').innerHTML='<span style="color:var(--dim);font-size:.85em">'+(lang==='zh'?'记录旋转以查看分析':'Record spins to see analysis')+'</span>';
-    document.getElementById('aBars').innerHTML='';document.getElementById('aBehind').innerHTML='';
-    document.getElementById('aRec').style.display='none';document.getElementById('aSvS').innerHTML='';
-    document.getElementById('aConv').innerHTML='';document.getElementById('endRec').style.display='none';return;
+
+  // Source banner
+  const srcEl=document.getElementById('aSourceBanner');
+  if(srcEl){
+    srcEl.textContent=nSess?
+      (lang==='zh'?'数据来源：'+nSess+' 场次 · '+n+' 次旋转（所有玩家）':'Data: '+nSess+' sessions · '+n+' spins (all players)'):
+      (lang==='zh'?'保存场次后查看分析':'Save sessions to see analysis');
   }
 
+  if(!nSess||!n){
+    document.getElementById('aBoxes').innerHTML='<span style="color:var(--dim);font-size:.85em">'+(lang==='zh'?'保存场次后查看分析':'Save sessions to see analysis')+'</span>';
+    document.getElementById('aBars').innerHTML='';
+    document.getElementById('aGap').innerHTML='';
+    document.getElementById('aColdRecovery').innerHTML='';
+    document.getElementById('aLeaderProfit').innerHTML='';
+    return;
+  }
+
+  // ===== METRIC 1: Element Hit Summary =====
   const d={};
   ELS.forEach(el=>{
-    const s=spins.filter(x=>x.hits[el]==='s').length;
-    const sp=spins.filter(x=>x.hits[el]==='sp').length;
+    const s=allSpins.filter(x=>x.hits&&x.hits[el]==='s').length;
+    const sp=allSpins.filter(x=>x.hits&&x.hits[el]==='sp').length;
     d[el]={s,sp,t:s+sp};
   });
 
-  // Summary boxes
   let boxH='';
   ELS.forEach(el=>{
     const pct=(d[el].t/n*100);
@@ -2129,7 +2160,6 @@ function refreshAnalysis(){
   });
   document.getElementById('aBoxes').innerHTML=boxH;
 
-  // Bars
   let barH='';
   ELS.forEach(el=>{
     const pct=(d[el].t/n*100);const diff=(pct-48.65).toFixed(1);const sign=diff>=0?'+':'';
@@ -2139,191 +2169,170 @@ function refreshAnalysis(){
   });
   document.getElementById('aBars').innerHTML=barH;
 
-  // Behind analysis
-  let behH='';
-  const expHitPct=48.65,expStPct=32.43,expSpPct=16.22;
+  // ===== METRIC 2: Straight vs Split Gap =====
+  const expStPct=32.43,expSpPct=16.22;
+  let gapH='';
   ELS.forEach(el=>{
-    const totalPct=(d[el].t/n*100);const stPct=(d[el].s/n*100);const spPct=(d[el].sp/n*100);
-    const behind=totalPct<expHitPct;const stBehind=stPct<expStPct;const spBehind=spPct<expSpPct;
+    const stPct=(d[el].s/n*100);const spPct=(d[el].sp/n*100);const totalPct=(d[el].t/n*100);
+    const behind=totalPct<48.65;const stBehind=stPct<expStPct;const spBehind=spPct<expSpPct;
     const stGap=(expStPct-stPct).toFixed(1);const spGap=(expSpPct-spPct).toFixed(1);
     let signal='',sigClass='';
-    if(behind&&stBehind&&!spBehind){signal=(lang==='zh'?'直注到期 — 分注正常，直注落后':'STRAIGHT DUE — splits OK, straight behind')+' '+stGap+'%';sigClass='signal-hot'}
-    else if(behind&&stBehind&&spBehind&&parseFloat(stGap)>parseFloat(spGap)){signal=(lang==='zh'?'直注更到期 — 两者都落后但直注差距更大':'STRAIGHT MORE DUE')+' ('+stGap+'% vs '+spGap+'%)';sigClass='signal-hot'}
-    else if(behind&&stBehind&&spBehind){signal=(lang==='zh'?'两者都落后':'Both behind')+' — S:-'+stGap+'%, Sp:-'+spGap+'%';sigClass='signal-watch'}
-    else if(behind&&!stBehind){signal=(lang==='zh'?'分注落后 — 直注正常':'Split behind — straight OK');sigClass='signal-watch'}
-    else{signal=(lang==='zh'?'正常或领先':'On track or ahead');sigClass='signal-cold'}
-    behH+=`<div class="behind-row"><span class="el-name" style="color:${L[el].c}">${L[el].s} ${behind?'▼':'✓'}</span>
+    if(behind&&stBehind&&!spBehind){signal=(lang==='zh'?'直注到期':'STRAIGHT DUE')+' -'+stGap+'%';sigClass='signal-hot'}
+    else if(behind&&stBehind&&spBehind&&parseFloat(stGap)>parseFloat(spGap)){signal=(lang==='zh'?'直注更到期':'STRAIGHT MORE DUE')+' (S:-'+stGap+'% Sp:-'+spGap+'%)';sigClass='signal-hot'}
+    else if(behind&&stBehind&&spBehind){signal=(lang==='zh'?'两者落后':'BOTH BEHIND')+' S:-'+stGap+'% Sp:-'+spGap+'%';sigClass='signal-watch'}
+    else if(behind&&!stBehind){signal=(lang==='zh'?'分注落后':'SPLIT BEHIND');sigClass='signal-watch'}
+    else{signal=(lang==='zh'?'正常':'ON TRACK');sigClass='signal-cold'}
+    const eName=lang==='zh'?L[el].cn:L[el].s;
+    gapH+=`<div class="behind-row"><span class="el-name" style="color:${L[el].c}">${eName}</span>
       <span class="detail">S:${stPct.toFixed(1)}%<span style="color:var(--dim)">/32.4</span> Sp:${spPct.toFixed(1)}%<span style="color:var(--dim)">/16.2</span></span>
       <span class="${sigClass}">${signal}</span></div>`;
   });
-  document.getElementById('aBehind').innerHTML=behH;
+  document.getElementById('aGap').innerHTML=gapH;
 
-  // Live recommendation
-  const rec=document.getElementById('aRec');
-  rec.style.display='block';
-  const behindEls=ELS.filter(el=>(d[el].t/n*100)<43);
-  const hotEls=ELS.filter(el=>(d[el].t/n*100)>54);
-  const liveSpins=Math.max(0,n-LED_COUNT);
+  // ===== METRIC 3: Cold Element Recovery =====
+  // Scan each session: find spins where an element has 4-blank streak AND is last place for 3+ spins
+  let coldEvents=0,recoveredEvents=0,totalSpinsToLeaveLastArr=[],totalSpinsToExpArr=[],neverRecovered=0;
 
-  // Strategy rules
-  let recHTML='';
+  pooled.forEach(sess=>{
+    const sp=sess.spins;
+    if(!sp||sp.length<15)return;
 
-  // Rule: Pick elements with more straight hits when choosing between options
-  const sortedByProfit=[...ELS].sort((a,b)=>(d[b].s*2+d[b].sp)-(d[a].s*2+d[a].sp));
-  const top2=sortedByProfit.slice(0,2);
+    ELS.forEach(el=>{
+      // Track running counts and blank streaks
+      let blankRun=0,lastPlaceRun=0;
+      const runCounts={};
+      ELS.forEach(e=>{runCounts[e]=0});
 
-  if(n<=LED_COUNT+3 && n>=5){
-    // Starting phase: suggest top 2 hot elements
-    rec.className='rec rec-go';
-    const names=top2.map(el=>'<span style="color:'+L[el].c+'">'+L[el].s+'</span>').join(', ');
-    recHTML='★ '+(lang==='zh'?'起始阶段：跟随前2个热门元素 ':'Starting phase: follow top 2 hot elements ')+names;
-    recHTML+='<br><span style="font-size:.8em;color:var(--dim)">'+(lang==='zh'?'优先选择直注命中多的元素':'Prefer elements with more straight hits')+'</span>';
-  }else if(behindEls.length>=2){
-    rec.className='rec rec-go';
-    recHTML='📊 '+behindEls.map(el=>'<span style="color:'+L[el].c+'">'+L[el].s+'</span>').join(',')+' '+(lang==='zh'?'落后 — 这些元素可能会追赶':'behind — may be due for a catch-up');
-    recHTML+='<br><span style="font-size:.8em;color:var(--dim)">'+(lang==='zh'?'但不要追逐唯一落后的元素！':'But don\'t chase the ONLY element that is behind!')+'</span>';
-  }else if(hotEls.length>=2){
-    rec.className='rec rec-stop';
-    recHTML='⚠️ '+(lang==='zh'?'多个元素领先 — 考虑保存利润':'Multiple elements running hot — consider banking profits');
-  }else if(liveSpins>=40 && liveSpins<=60){
-    rec.className='rec rec-wait';
-    recHTML='🎯 '+liveSpins+' '+(lang==='zh'?'次实际旋转（不含LED前'+LED_COUNT+'次）— 推荐场次长度内':'live spins (excl. LED first '+LED_COUNT+') — within recommended session length');
-  }else if(liveSpins>60){
-    rec.className='rec rec-stop';
-    recHTML='🛑 '+liveSpins+' '+(lang==='zh'?'次实际旋转 — 超过推荐场次长度，考虑结束':'live spins — exceeding recommended session length, consider stopping');
-  }else if(n>=5){
-    rec.className='rec rec-go';
-    recHTML='▶ '+(lang==='zh'?'记录中... ':'Recording... ')+n+' '+t('spins')+' ('+liveSpins+' '+(lang==='zh'?'次实际':'live')+')';
-  }
-  rec.innerHTML=recHTML;
+      for(let i=0;i<sp.length;i++){
+        // Update counts
+        ELS.forEach(e=>{
+          if(sp[i].hits&&(sp[i].hits[e]==='s'||sp[i].hits[e]==='sp'))runCounts[e]++;
+        });
+        // Blank streak
+        if(sp[i].hits&&sp[i].hits[el]==='-')blankRun++;else blankRun=0;
+        // Is this element last place?
+        const myCount=runCounts[el];
+        const isLast=ELS.every(e=>e===el||runCounts[e]>=myCount)&&ELS.some(e=>e!==el&&runCounts[e]>myCount);
+        if(isLast)lastPlaceRun++;else lastPlaceRun=0;
 
-  // Straight vs Split table
-  let svs=`<table style="width:100%;border-collapse:collapse;font-size:.8em;color:var(--txt)">
-    <tr><th style="text-align:left">${lang==='zh'?'元素':'Element'}</th><th>${lang==='zh'?'直注':'Straight'}</th><th>${lang==='zh'?'预期':'Exp'}</th><th>${lang==='zh'?'差距':'Gap'}</th><th>${lang==='zh'?'分注':'Split'}</th><th>${lang==='zh'?'预期':'Exp'}</th><th>${lang==='zh'?'差距':'Gap'}</th></tr>`;
-  ELS.forEach(el=>{
-    const stPct=(d[el].s/n*100);const spPct=(d[el].sp/n*100);
-    const stExp=(n*12/37).toFixed(1);const spExp=(n*6/37).toFixed(1);
-    const stGap=d[el].s-Math.round(n*12/37);const spGap=d[el].sp-Math.round(n*6/37);
-    const eName=lang==='zh'?L[el].cn:L[el].n;
-    svs+=`<tr><td style="color:${L[el].c};font-weight:700">${eName}</td>
-      <td style="text-align:center">${d[el].s} (${stPct.toFixed(1)}%)</td><td style="text-align:center;color:var(--dim)">${stExp}</td>
-      <td style="text-align:center;color:${stGap>=0?'#2ecc71':'#e74c3c'}">${stGap>=0?'+':''}${stGap}</td>
-      <td style="text-align:center">${d[el].sp} (${spPct.toFixed(1)}%)</td><td style="text-align:center;color:var(--dim)">${spExp}</td>
-      <td style="text-align:center;color:${spGap>=0?'#2ecc71':'#e74c3c'}">${spGap>=0?'+':''}${spGap}</td></tr>`;
-  });
-  svs+='</table>';
-  document.getElementById('aSvS').innerHTML=svs;
-
-  // Convergence
-  let convH='';
-  ELS.forEach(el=>{
-    const pct=(d[el].t/n*100);const diff=Math.abs(pct-48.65);
-    let est;
-    if(diff<5)est=lang==='zh'?'接近目标 ✓':'Near target ✓';
-    else{const target=18/37;const cur=d[el].t/n;const gap=Math.abs(cur-target);const needed=Math.round(gap*n/(0.05-gap+0.001));
-      est='~'+Math.max(10,Math.min(200,needed))+' '+(lang==='zh'?'更多旋转':'more spins')}
-    convH+=`<div class="bar-row"><span class="bar-el" style="color:${L[el].c}">${L[el].s}</span>
-      <span style="font-size:.85em;flex:1">${pct.toFixed(1)}% → ${est}</span></div>`;
-  });
-  document.getElementById('aConv').innerHTML=convH;
-
-  // ===== SESSION END RECOMMENDATIONS =====
-  refreshEndRec(d,n);
-}
-
-function refreshEndRec(d,n){
-  const endRec=document.getElementById('endRec');
-  const liveSpins=Math.max(0,n-LED_COUNT);
-  if(n<25){endRec.style.display='none';return}
-  endRec.style.display='block';
-
-  // Win/Loss estimate (15 units per spin, each straight pays 35:1, each split pays 17:1)
-  // Total bet per spin: 12 straight (1 unit each) + 3 splits (1 unit each) = 15 units
-  // Straight hit: win 35 units (net +35-15+1 = +21 from that spin)
-  // Split hit: win 17 units (net +17-15+1 = +3)
-  // Miss: lose 15 units
-  // We can estimate P&L from the spin data
-  let totalPL=0;
-  spins.forEach(sp=>{
-    // For each spin, player bets on ONE element at a time. But we track all 5.
-    // Actually, the player bets on one element. We don't know which.
-    // So we show P&L for EACH element if they had bet on it.
-  });
-
-  // Show per-element P&L estimate
-  const plData={};
-  ELS.forEach(el=>{
-    let pl=0;
-    spins.forEach(sp=>{
-      if(sp.hits[el]==='s') pl+=21; // straight: +35 win -15 cost +1 (get back the winning chip) = +21
-      else if(sp.hits[el]==='sp') pl+=3; // split: +17 win -15 cost +1 = +3
-      else pl-=15; // miss
+        // Trigger: 4-blank streak AND last place for 3+ spins (both at this spin)
+        if(blankRun>=4&&lastPlaceRun>=3){
+          coldEvents++;
+          // Measure recovery from this spin
+          let leftLast=false,reachedExp=false,spinsToLeaveLast=0,spinsToExp=0;
+          for(let j=i+1;j<sp.length;j++){
+            ELS.forEach(e=>{
+              if(sp[j].hits&&(sp[j].hits[e]==='s'||sp[j].hits[e]==='sp'))runCounts[e]++;
+            });
+            const myC=runCounts[el];
+            const stillLast=ELS.every(e=>e===el||runCounts[e]>=myC)&&ELS.some(e=>e!==el&&runCounts[e]>myC);
+            if(!leftLast&&!stillLast){leftLast=true;spinsToLeaveLast=j-i}
+            const myPct=myC/(j+1)*100;
+            if(!reachedExp&&myPct>=46.65){reachedExp=true;spinsToExp=j-i} // within 2% of 48.65
+            if(leftLast&&reachedExp)break;
+          }
+          if(leftLast){recoveredEvents++;totalSpinsToLeaveLastArr.push(spinsToLeaveLast)}
+          else{neverRecovered++}
+          if(reachedExp)totalSpinsToExpArr.push(spinsToExp);
+          // Skip ahead to avoid double-counting overlapping events
+          blankRun=0;lastPlaceRun=0;
+        }
+      }
     });
-    plData[el]=pl;
   });
 
-  // Find best and worst performing elements
-  const sortedEls=[...ELS].sort((a,b)=>plData[b]-plData[a]);
-  const bestEl=sortedEls[0];
-  const worstEl=sortedEls[sortedEls.length-1];
-
-  // Verdict
-  const verdict=document.getElementById('endVerdict');
-  const reasons=document.getElementById('endReasons');
-  let reasonsHTML='';
-
-  // Element catch-up predictions
-  const behindEls=ELS.filter(el=>{
-    const stPct=d[el].s/n;const spPct=d[el].sp/n;
-    return stPct<(12/37) || spPct<(6/37);
-  });
-
-  const dueEls=ELS.filter(el=>{
-    const stPct=d[el].s/n;
-    return stPct<(12/37)*0.85; // 15% below expected
-  });
-
-  // Overall verdict
-  const anyUp=Object.values(plData).some(v=>v>0);
-  const allDown=Object.values(plData).every(v=>v<0);
-  const maxPL=Math.max(...Object.values(plData));
-  const avgPL=Object.values(plData).reduce((a,b)=>a+b,0)/5;
-
-  if(liveSpins>=40 && avgPL>0){
-    verdict.style.background='rgba(231,76,60,.2)';verdict.style.color='#e74c3c';
-    verdict.textContent=lang==='zh'?'🛑 '+t('rec_stop_title'):'🛑 '+t('rec_stop_title');
-    reasonsHTML+=`<div class="reason">💰 ${t('rec_you_up')}</div>`;
-  }else if(dueEls.length>=2 && liveSpins<60){
-    verdict.style.background='rgba(46,204,113,.2)';verdict.style.color='#2ecc71';
-    verdict.textContent=lang==='zh'?'▶ '+t('rec_cont_title'):'▶ '+t('rec_cont_title');
-  }else if(liveSpins>=40 && allDown){
-    verdict.style.background='rgba(231,76,60,.2)';verdict.style.color='#e74c3c';
-    verdict.textContent='🛑 '+t('rec_stop_title');
-    reasonsHTML+=`<div class="reason">📉 ${t('rec_you_down')}</div>`;
+  let coldH='';
+  if(coldEvents===0){
+    coldH='<div style="color:var(--dim);font-size:.85em;padding:8px">'+(lang==='zh'?'未发现冷+末位事件（需要更多数据）':'No cold + last place events found (need more data)')+'</div>';
   }else{
-    verdict.style.background='rgba(241,196,15,.2)';verdict.style.color='#f1c40f';
-    verdict.textContent='⚠️ '+t('rec_caution_title');
+    const avgLeave=totalSpinsToLeaveLastArr.length?
+      (totalSpinsToLeaveLastArr.reduce((a,b)=>a+b,0)/totalSpinsToLeaveLastArr.length).toFixed(1):'N/A';
+    const avgExp=totalSpinsToExpArr.length?
+      (totalSpinsToExpArr.reduce((a,b)=>a+b,0)/totalSpinsToExpArr.length).toFixed(1):'N/A';
+    const neverPct=(neverRecovered/coldEvents*100).toFixed(0);
+    coldH=`<table style="width:100%;border-collapse:collapse;font-size:.82em;color:var(--txt)">
+      <tr><td style="padding:4px 6px;color:var(--dim)">${lang==='zh'?'发现事件数':'Events found'}</td><td style="padding:4px 6px;font-weight:700">${coldEvents}</td></tr>
+      <tr><td style="padding:4px 6px;color:var(--dim)">${lang==='zh'?'平均离开末位':'Avg spins to leave last'}</td><td style="padding:4px 6px;font-weight:700;color:#2ecc71">${avgLeave} ${lang==='zh'?'旋转':'spins'}</td></tr>
+      <tr><td style="padding:4px 6px;color:var(--dim)">${lang==='zh'?'平均达到预期%':'Avg spins to reach expected %'}</td><td style="padding:4px 6px;font-weight:700;color:#2ecc71">${avgExp} ${lang==='zh'?'旋转':'spins'}</td></tr>
+      <tr><td style="padding:4px 6px;color:var(--dim)">${lang==='zh'?'场次结束前未恢复':'Never recovered (session ended)'}</td><td style="padding:4px 6px;font-weight:700;color:#e74c3c">${neverPct}% (${neverRecovered}/${coldEvents})</td></tr>
+      <tr><td style="padding:4px 6px;color:var(--dim)">${lang==='zh'?'已恢复':'Recovered'}</td><td style="padding:4px 6px;font-weight:700;color:#2ecc71">${recoveredEvents}/${coldEvents}</td></tr>
+    </table>`;
   }
+  document.getElementById('aColdRecovery').innerHTML=coldH;
 
-  // Per-element predictions
-  ELS.forEach(el=>{
-    const stPct=d[el].s/n;const spPct=d[el].sp/n;
-    const eName=lang==='zh'?L[el].cn:L[el].n;
-    const plStr=plData[el]>=0?'+'+plData[el]:plData[el];
+  // ===== METRIC 4: Leader Profitability After Suggestion =====
+  // For each session: find spins where any element first reaches session-wide lead >= 2
+  // Then track unit P&L from that point if player bet on that element
+  let sugEvents=0,sugWins=0,totalProfSpins=[],totalSpinsToBlanks=[],peakUnits=[],finalUnits=[];
 
-    if(stPct<(12/37)*0.85){
-      reasonsHTML+=`<div class="reason" style="border-left:3px solid ${L[el].c};padding-left:8px">
-        <span style="color:${L[el].c};font-weight:700">${eName}</span>: ${t('rec_element_due')} (P&L: ${plStr}u)</div>`;
-    }else if(stPct<(12/37) && spPct<(6/37)){
-      reasonsHTML+=`<div class="reason" style="border-left:3px solid ${L[el].c};padding-left:8px">
-        <span style="color:${L[el].c};font-weight:700">${eName}</span>: ${t('rec_both_behind')} (P&L: ${plStr}u)</div>`;
-    }else{
-      reasonsHTML+=`<div class="reason" style="border-left:3px solid ${L[el].c};padding-left:8px">
-        <span style="color:${L[el].c};font-weight:700">${eName}</span>: ${t('rec_on_track')} (P&L: ${plStr}u)</div>`;
+  pooled.forEach(sess=>{
+    const sp=sess.spins;
+    if(!sp||sp.length<15)return;
+    const counts={};
+    ELS.forEach(e=>{counts[e]=0});
+    let suggested=false;
+
+    for(let i=0;i<sp.length;i++){
+      ELS.forEach(e=>{
+        if(sp[i].hits&&(sp[i].hits[e]==='s'||sp[i].hits[e]==='sp'))counts[e]++;
+      });
+      if(i<12)continue; // grace period
+
+      if(!suggested){
+        // Find leader with lead >= 2
+        const sorted=[...ELS].sort((a,b)=>counts[b]-counts[a]);
+        const lead=counts[sorted[0]]-(counts[sorted[1]]||0);
+        if(lead>=2){
+          suggested=true;
+          const sugEl=sorted[0];
+          sugEvents++;
+
+          // Track P&L from next spin onward betting on sugEl
+          let cumPL=0,peak=0,profSpins=0,spinsToBlanks=0,blankRun=0,foundBlanks=false;
+          for(let j=i+1;j<sp.length;j++){
+            const ht=sp[j].hits?sp[j].hits[sugEl]:'-';
+            if(ht==='s')cumPL+=21;
+            else if(ht==='sp')cumPL+=3;
+            else cumPL-=15;
+            if(cumPL>peak)peak=cumPL;
+            if(cumPL>=0)profSpins=j-i;
+
+            // Track 4-blank streak
+            if(ht==='-')blankRun++;else blankRun=0;
+            if(!foundBlanks&&blankRun>=4){foundBlanks=true;spinsToBlanks=j-i}
+          }
+          totalProfSpins.push(profSpins);
+          peakUnits.push(peak);
+          finalUnits.push(cumPL);
+          if(foundBlanks)totalSpinsToBlanks.push(spinsToBlanks);
+          if(cumPL>0)sugWins++;
+        }
+      }
     }
   });
 
-  reasons.innerHTML=reasonsHTML;
+  let lpH='';
+  if(sugEvents===0){
+    lpH='<div style="color:var(--dim);font-size:.85em;padding:8px">'+(lang==='zh'?'未发现领先≥2事件（需要更多数据）':'No lead ≥ 2 suggestions found (need more data)')+'</div>';
+  }else{
+    const avgProf=totalProfSpins.length?(totalProfSpins.reduce((a,b)=>a+b,0)/totalProfSpins.length).toFixed(1):'0';
+    const avgBlanks=totalSpinsToBlanks.length?(totalSpinsToBlanks.reduce((a,b)=>a+b,0)/totalSpinsToBlanks.length).toFixed(1):'N/A';
+    const avgPeak=peakUnits.length?(peakUnits.reduce((a,b)=>a+b,0)/peakUnits.length).toFixed(1):'0';
+    const avgFinal=finalUnits.length?(finalUnits.reduce((a,b)=>a+b,0)/finalUnits.length).toFixed(1):'0';
+    const winRate=(sugWins/sugEvents*100).toFixed(0);
+    const finalColor=parseFloat(avgFinal)>=0?'#2ecc71':'#e74c3c';
+    const peakColor='#2ecc71';
+    lpH=`<table style="width:100%;border-collapse:collapse;font-size:.82em;color:var(--txt)">
+      <tr><td style="padding:4px 6px;color:var(--dim)">${lang==='zh'?'建议触发次数':'Suggestions triggered'}</td><td style="padding:4px 6px;font-weight:700">${sugEvents} (${lang==='zh'?'跨':'across'} ${nSess} ${lang==='zh'?'场':'sessions'})</td></tr>
+      <tr><td style="padding:4px 6px;color:var(--dim)">${lang==='zh'?'盈利旋转数':'Avg profitable spins'}</td><td style="padding:4px 6px;font-weight:700;color:#2ecc71">${avgProf} ${lang==='zh'?'旋转':'spins'}</td></tr>
+      <tr><td style="padding:4px 6px;color:var(--dim)">${lang==='zh'?'到4连空旋转':'Avg spins to 4-blank (H1)'}</td><td style="padding:4px 6px;font-weight:700">${avgBlanks} ${lang==='zh'?'旋转':'spins'}</td></tr>
+      <tr><td style="padding:4px 6px;color:var(--dim)">${lang==='zh'?'峰值单位':'Avg peak units won'}</td><td style="padding:4px 6px;font-weight:700;color:${peakColor}">+${avgPeak}u</td></tr>
+      <tr><td style="padding:4px 6px;color:var(--dim)">${lang==='zh'?'最终单位':'Avg final units W/L'}</td><td style="padding:4px 6px;font-weight:700;color:${finalColor}">${parseFloat(avgFinal)>=0?'+':''}${avgFinal}u</td></tr>
+      <tr><td style="padding:4px 6px;color:var(--dim)">${lang==='zh'?'赢率':'Win rate'}</td><td style="padding:4px 6px;font-weight:700;color:${parseFloat(winRate)>=50?'#2ecc71':'#e74c3c'}">${winRate}%</td></tr>
+      <tr><td style="padding:4px 6px;color:var(--dim)">${lang==='zh'?'平均每建议单位':'Avg units per suggestion'}</td><td style="padding:4px 6px;font-weight:700;color:${finalColor}">${parseFloat(avgFinal)>=0?'+':''}${avgFinal}u</td></tr>
+    </table>`;
+  }
+  document.getElementById('aLeaderProfit').innerHTML=lpH;
 }
 
 // ===== SESSIONS TAB =====
