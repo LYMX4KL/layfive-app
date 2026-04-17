@@ -32,6 +32,211 @@
   var VISION_LS_SECRET = 'lf_ocr_vision_secret';
   var VISION_LS_ENABLED = 'lf_ocr_vision_enabled';
 
+  // ---------- AI Learning: correction tracking ----------
+  // Tracks what the OCR read vs what the user corrected, so we can:
+  //   1. Learn which digit confusions happen most often
+  //   2. Dynamically adjust the Vision prompt with personalized hints
+  //   3. Save cropped images + corrections as training data for future models
+  var LEARN_LS_KEY = 'lf_ocr_learn';        // localStorage key for corrections log
+  var LEARN_LS_PATTERNS = 'lf_ocr_patterns'; // localStorage key for aggregated confusion patterns
+
+  function _learnLoadLog() {
+    try { return JSON.parse(localStorage.getItem(LEARN_LS_KEY)) || []; } catch (e) { return []; }
+  }
+  function _learnSaveLog(log) {
+    try { localStorage.setItem(LEARN_LS_KEY, JSON.stringify(log)); } catch (e) {}
+  }
+  function _learnLoadPatterns() {
+    try { return JSON.parse(localStorage.getItem(LEARN_LS_PATTERNS)) || {}; } catch (e) { return {}; }
+  }
+  function _learnSavePatterns(p) {
+    try { localStorage.setItem(LEARN_LS_PATTERNS, JSON.stringify(p)); } catch (e) {}
+  }
+
+  // Compare original OCR output vs user-corrected list.
+  // Uses longest-common-subsequence alignment so inserts, deletes, and
+  // substitutions are detected even when the user reordered rows.
+  function _learnComputeDiff(original, corrected) {
+    // Build LCS table
+    var m = original.length, n = corrected.length;
+    var dp = [];
+    for (var i = 0; i <= m; i++) {
+      dp[i] = [];
+      for (var j = 0; j <= n; j++) {
+        if (i === 0 || j === 0) dp[i][j] = 0;
+        else if (original[i-1] === corrected[j-1]) dp[i][j] = dp[i-1][j-1] + 1;
+        else dp[i][j] = Math.max(dp[i-1][j], dp[i][j-1]);
+      }
+    }
+    // Backtrack to find edits
+    var edits = [];
+    var ii = m, jj = n;
+    while (ii > 0 && jj > 0) {
+      if (original[ii-1] === corrected[jj-1]) { ii--; jj--; }
+      else if (dp[ii-1][jj] >= dp[ii][jj-1]) {
+        edits.push({ type: 'delete', ocrValue: original[ii-1], position: ii-1 });
+        ii--;
+      } else {
+        edits.push({ type: 'insert', userValue: corrected[jj-1], position: jj-1 });
+        jj--;
+      }
+    }
+    while (ii > 0) { edits.push({ type: 'delete', ocrValue: original[ii-1], position: ii-1 }); ii--; }
+    while (jj > 0) { edits.push({ type: 'insert', userValue: corrected[jj-1], position: jj-1 }); jj--; }
+
+    // Also detect substitutions: adjacent delete+insert at same position
+    // Simple approach: walk original & corrected in order, if lengths match
+    // and values differ at index i, that's a substitution
+    var substitutions = [];
+    var minLen = Math.min(m, n);
+    for (var k = 0; k < minLen; k++) {
+      if (original[k] !== corrected[k]) {
+        substitutions.push({ ocrRead: original[k], userCorrected: corrected[k], position: k });
+      }
+    }
+    return { edits: edits, substitutions: substitutions, origLen: m, corrLen: n };
+  }
+
+  // Update aggregated confusion patterns from a diff
+  function _learnUpdatePatterns(diff) {
+    var patterns = _learnLoadPatterns();
+    // Track substitution patterns: "6->9" means OCR read 6, user said 9
+    diff.substitutions.forEach(function (s) {
+      var key = s.ocrRead + '->' + s.userCorrected;
+      if (!patterns[key]) patterns[key] = { count: 0, firstSeen: Date.now() };
+      patterns[key].count++;
+      patterns[key].lastSeen = Date.now();
+    });
+    // Track insert count (OCR missed numbers)
+    var insertCount = diff.edits.filter(function (e) { return e.type === 'insert'; }).length;
+    if (insertCount > 0) {
+      if (!patterns._missedNumbers) patterns._missedNumbers = { count: 0 };
+      patterns._missedNumbers.count += insertCount;
+    }
+    // Track delete count (OCR hallucinated numbers)
+    var deleteCount = diff.edits.filter(function (e) { return e.type === 'delete'; }).length;
+    if (deleteCount > 0) {
+      if (!patterns._extraNumbers) patterns._extraNumbers = { count: 0 };
+      patterns._extraNumbers.count += deleteCount;
+    }
+    _learnSavePatterns(patterns);
+    return patterns;
+  }
+
+  // Record a complete correction event
+  function _learnRecordCorrection(original, corrected, imageDataUrl, engine) {
+    var diff = _learnComputeDiff(original, corrected);
+    // Skip if no changes were made (user accepted OCR as-is)
+    var hasChanges = diff.substitutions.length > 0 || diff.edits.length > 0;
+
+    // Always update patterns (even no-change = positive signal)
+    var patterns = _learnUpdatePatterns(diff);
+    if (!patterns._totalScans) patterns._totalScans = { count: 0 };
+    patterns._totalScans.count++;
+    if (!hasChanges) {
+      if (!patterns._perfectScans) patterns._perfectScans = { count: 0 };
+      patterns._perfectScans.count++;
+    }
+    _learnSavePatterns(patterns);
+
+    // Save to local correction log (keep last 200 entries)
+    var log = _learnLoadLog();
+    var entry = {
+      ts: Date.now(),
+      engine: engine || 'unknown',
+      original: original,
+      corrected: corrected,
+      subs: diff.substitutions.length,
+      inserts: diff.edits.filter(function (e) { return e.type === 'insert'; }).length,
+      deletes: diff.edits.filter(function (e) { return e.type === 'delete'; }).length,
+      perfect: !hasChanges
+    };
+    log.push(entry);
+    if (log.length > 200) log = log.slice(-200);
+    _learnSaveLog(log);
+
+    // Save to Firebase if available (training data)
+    _learnSaveToFirebase(entry, imageDataUrl);
+
+    return { diff: diff, patterns: patterns, hasChanges: hasChanges };
+  }
+
+  // Push correction + image to Firebase for training data collection
+  function _learnSaveToFirebase(entry, imageDataUrl) {
+    // Requires firebase globals from index.html
+    if (typeof db === 'undefined' || typeof currentUser === 'undefined') return;
+    if (!window.firebaseReady || !window.currentUser) return;
+    try {
+      var doc = {
+        ts: entry.ts,
+        engine: entry.engine,
+        original: entry.original,
+        corrected: entry.corrected,
+        subs: entry.subs,
+        inserts: entry.inserts,
+        deletes: entry.deletes,
+        perfect: entry.perfect
+      };
+      // Save the cropped image for training (only if there were corrections)
+      if (imageDataUrl && !entry.perfect) {
+        doc.image = imageDataUrl;
+      }
+      db.collection('users').doc(currentUser.uid)
+        .collection('ocr_training').add(doc)
+        .catch(function (e) { console.warn('[ocr-learn] Firebase save failed', e); });
+    } catch (e) { console.warn('[ocr-learn] Firebase error', e); }
+  }
+
+  // Build a dynamic prompt hint from learned correction patterns.
+  // This gets appended to the Vision API prompt when patterns are available.
+  function _learnGetPromptHints() {
+    var patterns = _learnLoadPatterns();
+    var hints = [];
+    var keys = Object.keys(patterns).filter(function (k) { return k.indexOf('->') >= 0; });
+    // Sort by frequency (most common confusions first)
+    keys.sort(function (a, b) { return (patterns[b].count || 0) - (patterns[a].count || 0); });
+    // Take top 5 most common confusions
+    var top = keys.slice(0, 5);
+    top.forEach(function (k) {
+      var parts = k.split('->');
+      var cnt = patterns[k].count;
+      if (cnt >= 2) { // Only include if it happened at least twice
+        hints.push('This user frequently corrects ' + parts[0] + ' to ' + parts[1] + ' (' + cnt + ' times) — pay extra attention to distinguishing these.');
+      }
+    });
+    if (!hints.length) return '';
+    return '\n\nLEARNED FROM USER CORRECTIONS:\n' + hints.join('\n');
+  }
+
+  // Get learning stats summary (for display in settings or analysis)
+  function _learnGetStats() {
+    var patterns = _learnLoadPatterns();
+    var log = _learnLoadLog();
+    var totalScans = (patterns._totalScans && patterns._totalScans.count) || 0;
+    var perfectScans = (patterns._perfectScans && patterns._perfectScans.count) || 0;
+    var missedNumbers = (patterns._missedNumbers && patterns._missedNumbers.count) || 0;
+    var extraNumbers = (patterns._extraNumbers && patterns._extraNumbers.count) || 0;
+    // Top confusions
+    var confusions = Object.keys(patterns)
+      .filter(function (k) { return k.indexOf('->') >= 0; })
+      .map(function (k) { return { pair: k, count: patterns[k].count }; })
+      .sort(function (a, b) { return b.count - a.count; })
+      .slice(0, 10);
+    return {
+      totalScans: totalScans,
+      perfectScans: perfectScans,
+      accuracy: totalScans > 0 ? Math.round((perfectScans / totalScans) * 100) : 0,
+      missedNumbers: missedNumbers,
+      extraNumbers: extraNumbers,
+      topConfusions: confusions,
+      recentLog: log.slice(-10)
+    };
+  }
+
+  // Expose stats for the settings/analysis UI
+  window._lfOcrLearnStats = _learnGetStats;
+  window._lfOcrLearnPatterns = _learnLoadPatterns;
+
   function getVisionSecret() {
     try { return localStorage.getItem(VISION_LS_SECRET) || ''; } catch (e) { return ''; }
   }
@@ -318,7 +523,12 @@
     document.getElementById('lfocr-cancel').onclick = closeAllOcr;
   }
 
+  // Track which engine was used for the current scan (for learning records)
+  var _currentScanEngine = 'tesseract';
+
   function showConfirmModal(numbers, imageDataUrl, processedDataUrl) {
+    // Snapshot the original OCR output for learning comparison on confirm
+    var _originalOcrNumbers = numbers.slice();
     closeAllOcr();
     var overlay = document.createElement('div');
     overlay.id = 'lfocr-confirm-overlay';
@@ -544,6 +754,19 @@
       var chronological = (orderVal === 'newest-top') ? nums.slice().reverse() : nums.slice();
       var ok = confirm('Import ' + chronological.length + ' numbers into the Scorecard?\n\nOldest-first order (as they\'ll be added): ' + chronological.join(', '));
       if (!ok) return;
+
+      // --- AI Learning: record what OCR got vs what user confirmed ---
+      try {
+        var result = _learnRecordCorrection(_originalOcrNumbers, nums, imageDataUrl, _currentScanEngine);
+        if (result.hasChanges) {
+          console.log('[ocr-learn] Corrections recorded:', result.diff.substitutions.length, 'subs,',
+            result.diff.edits.filter(function(e){return e.type==='insert'}).length, 'inserts,',
+            result.diff.edits.filter(function(e){return e.type==='delete'}).length, 'deletes');
+        } else {
+          console.log('[ocr-learn] Perfect scan — no corrections needed');
+        }
+      } catch (e) { console.warn('[ocr-learn] Failed to record', e); }
+
       closeAllOcr();
       // Push one by one. (addSpin triggers refreshAll/PL hook per call.)
       for (var j = 0; j < chronological.length; j++) {
@@ -573,13 +796,14 @@
   // of numbers in the order they appear on the board (top to bottom).
   function callVisionApi(croppedDataUrl) {
     var secret = getVisionSecret();
+    var hints = _learnGetPromptHints(); // Dynamic hints from correction history
     return fetch(VISION_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-OCR-Secret': secret
       },
-      body: JSON.stringify({ image: croppedDataUrl })
+      body: JSON.stringify({ image: croppedDataUrl, hints: hints || undefined })
     }).then(function (res) {
       if (!res.ok) {
         return res.text().then(function (t) { throw new Error('Vision API ' + res.status + ': ' + t.slice(0, 200)); });
@@ -593,6 +817,7 @@
   function runOcrPipeline(croppedDataUrl) {
       openOverlay();
       if (isVisionEnabled()) {
+        _currentScanEngine = 'vision';
         showStatus('Calling Claude Vision...');
         callVisionApi(croppedDataUrl).then(function (nums) {
           // Pass the original crop as both "photo" and "what was seen" — no
@@ -609,6 +834,7 @@
   }
 
   function runTesseractPipeline(croppedDataUrl) {
+      _currentScanEngine = 'tesseract';
       showStatus('Preparing image...');
       var processedDataUrl = null;
       preprocessImage(croppedDataUrl).then(function (result) {
@@ -716,6 +942,7 @@
         '<div style="margin:10px 0 6px;font-size:.8em;color:#aaa;text-align:center">OCR engine:</div>' +
         '<button id="lfocr-engine-btn" style="width:100%;padding:8px;margin-bottom:6px;background:' + engineColor + ';color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:.9em">' + engineLabel + '</button>' +
         '<button id="lfocr-engine-setup" style="width:100%;padding:6px;margin-bottom:8px;background:#333;color:#bbb;border:none;border-radius:6px;cursor:pointer;font-size:.8em">Vision setup</button>' +
+        '<div id="lfocr-learn-stats" style="margin:8px 0;font-size:.75em;color:#888"></div>' +
         '<button id="lfocr-src-cancel" style="width:100%;padding:8px;background:#444;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer">Cancel</button>' +
       '</div>';
     document.body.appendChild(overlay);
@@ -748,6 +975,30 @@
       showSourcePicker();
     };
     document.getElementById('lfocr-src-cancel').onclick = function () { overlay.remove(); };
+
+    // Show AI learning stats if any scans have been done
+    try {
+      var stats = _learnGetStats();
+      var statsEl = document.getElementById('lfocr-learn-stats');
+      if (statsEl && stats.totalScans > 0) {
+        var html = '<div style="background:#0f1320;border:1px solid #333;border-radius:6px;padding:6px 8px">' +
+          '<div style="color:#d4af37;font-weight:700;margin-bottom:3px">🧠 AI Learning</div>' +
+          '<div>Scans: <b>' + stats.totalScans + '</b> · Perfect: <b>' + stats.perfectScans + '</b> (' + stats.accuracy + '%)</div>';
+        if (stats.topConfusions.length > 0) {
+          html += '<div style="margin-top:3px">Top confusions: ';
+          html += stats.topConfusions.slice(0, 3).map(function (c) {
+            var parts = c.pair.split('->');
+            return '<span style="color:#ff9a3c">' + parts[0] + '→' + parts[1] + '</span> ×' + c.count;
+          }).join(', ');
+          html += '</div>';
+        }
+        if (stats.missedNumbers > 0) {
+          html += '<div>Missed numbers: ' + stats.missedNumbers + ' · Extra: ' + stats.extraNumbers + '</div>';
+        }
+        html += '</div>';
+        statsEl.innerHTML = html;
+      }
+    } catch (e) { /* stats display is non-critical */ }
   }
 
   function tryInstall() {
