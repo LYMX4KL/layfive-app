@@ -90,7 +90,7 @@ button{font-family:inherit}
 
 /* === STRATEGY SIGNAL CELLS === */
 .sig-cell{cursor:pointer;font-size:.9em;font-weight:700}
-.sig-cold{color:#e74c3c}.sig-safe{color:#2ecc71}.sig-caution{color:#f1c40f}.sig-hot{color:#ff6600}
+.sig-cold{color:#e74c3c}.sig-safe{color:#2ecc71}.sig-caution{color:#f1c40f}.sig-hot{color:#ff6600}.sig-suggest{color:#00e676;text-shadow:0 0 6px rgba(0,230,118,.5)}
 .sig-count{color:#aaa;font-size:.75em;font-weight:400}
 
 /* === SIGNAL POPUP === */
@@ -527,6 +527,7 @@ button{font-family:inherit}
   <div id="restartWarn" style="display:none;margin:6px 0;padding:8px 10px;background:rgba(255,140,0,.18);border:1px solid #ff8c00;border-radius:6px;color:#ffb347;font-size:.85em;text-align:center" data-i18n="restart_warn">⚠ Approaching 60 spins — consider Restart to refresh the pattern.</div>
   <!-- Scorecard -->
   <div class="sc-wrap">
+    <div id="rulesStatusBar" style="display:none;padding:4px 8px;margin:0 0 4px;border-radius:6px;background:#1a1520;border:1px solid #333;font-size:.78em;line-height:1.5;color:#ccc"></div>
     <table class="sc"><thead><tr>
       <th class="rn">#</th><th class="sn">Drop</th>
       <th class="hM el" data-i18n="hdr_metal">● Metal</th><th class="hW el" data-i18n="hdr_wood">▮ Wood</th><th class="hWa el" data-i18n="hdr_water">~ Water</th><th class="hF el" data-i18n="hdr_fire">▲ Fire</th><th class="hE el" data-i18n="hdr_earth">■ Earth</th>
@@ -1243,6 +1244,10 @@ function hitType(num,el){
 let spins=[];
 let sessions=[];
 
+// View offset: when >0, scorecard columns show only spins from this index onward,
+// but all spins remain in the array for saving/analysis.
+let _restartViewOffset=0;
+
 // ===== INIT =====
 (function init(){
   const savedLang=localStorage.getItem('lf_lang');
@@ -1437,9 +1442,6 @@ async function restartSess(){
   refreshAll();
   alert(t('restart_done'));
 }
-// View offset: when >0, scorecard columns show only spins from this index onward,
-// but all spins remain in the array for saving/analysis.
-let _restartViewOffset=0;
 
 // Save current session without alert/validation prompts; tag with reason.
 // Helper: snapshot active P&L state for bundling into a saved session
@@ -1694,7 +1696,7 @@ function showTab(i){
 }
 
 // ===== REFRESH ALL =====
-function refreshAll(){refreshScorecard();refreshAnalysis();refreshBehindBanner()}
+function refreshAll(){refreshScorecard();refreshAnalysis();refreshBehindBanner();refreshRulesStatus()}
 
 function refreshScorecard(){
   const sinceRestart=_restartViewOffset>0?(spins.length-_restartViewOffset):spins.length;
@@ -1857,6 +1859,42 @@ function computeSignals(){
     });
   }
 
+  // v3.1 Suggestion: green star on element with session-wide lead >= 2.
+  // Only fires after the 12-spin grace period. Overrides other signals for
+  // the leading element (except cold — mark X if 4 blanks in last 15).
+  if(n>LED_COUNT){
+    // Compute session-wide hit counts
+    const sessCounts={};
+    ELS.forEach(el=>{sessCounts[el]=spins.filter(x=>x.hits[el]==='s'||x.hits[el]==='sp').length});
+    const sortedEls=[...ELS].sort((a,b)=>sessCounts[b]-sessCounts[a]);
+    const topEl=sortedEls[0];
+    const secondCount=sessCounts[sortedEls[1]]||0;
+    const lead=sessCounts[topEl]-secondCount;
+
+    if(lead>=2){
+      // Check if leader has 4-blank streak in last 15 (cold = X override)
+      const last15=spins.slice(-15);
+      let blankRun=0,maxBlank=0;
+      last15.forEach(sp=>{
+        if(sp.hits[topEl]==='-'){blankRun++;if(blankRun>maxBlank)maxBlank=blankRun}
+        else blankRun=0;
+      });
+      if(maxBlank>=4){
+        // Leader is cold despite lead — mark X warning
+        signals[topEl]={
+          symbol:'✕',cls:'sig-cold',count:sessCounts[topEl]+'/'+n,
+          type:'suggest_cold',lead:lead,maxBlank:maxBlank,window:15
+        };
+      }else{
+        // Green star suggestion
+        signals[topEl]={
+          symbol:'★',cls:'sig-suggest',count:'+'+lead,
+          type:'suggest',lead:lead,totalHits:sessCounts[topEl]
+        };
+      }
+    }
+  }
+
   return signals;
 }
 
@@ -1910,6 +1948,16 @@ function showSignalPopup(el){
     msg=lang==='zh'
       ?`根据预有记录，这是前2个热门元素之一（排名第${sig.rank}）。建议从这些元素开始下注。`
       :`Based on preexisting records, this is one of the top 2 hot elements (rank #${sig.rank}). Recommended to start betting with these.`;
+  }else if(sig.type==='suggest'){
+    title=lang==='zh'?'★ 推荐元素 — '+eName:'★ SUGGESTED — '+eName;
+    msg=lang==='zh'
+      ?`此元素在整场中领先 ${sig.lead} 次命中（共 ${sig.totalHits} 次）。这是当前最强元素。<br><br><strong style="color:#00e676">规则：领先≥2时，考虑跟随此元素下注。</strong>`
+      :`This element leads the session by ${sig.lead} hits (${sig.totalHits} total). It's the strongest element right now.<br><br><strong style="color:#00e676">Rule: When lead ≥ 2, consider betting on this element.</strong>`;
+  }else if(sig.type==='suggest_cold'){
+    title=lang==='zh'?'⚠ 领先但冷 — '+eName:'⚠ LEADER BUT COLD — '+eName;
+    msg=lang==='zh'
+      ?`此元素在整场中领先 ${sig.lead} 次，但最近15次旋转中连续空白 ${sig.maxBlank} 次。<br><br><strong style="color:#e74c3c">规则：领先元素正在冷却——等待恢复再跟随，或考虑其他选择。</strong>`
+      :`This element leads the session by ${sig.lead} hits, but had a ${sig.maxBlank}-blank streak in the last 15 spins.<br><br><strong style="color:#e74c3c">Rule: The leader is going cold — wait for recovery before following, or consider another pick.</strong>`;
   }
 
   const overlay=document.createElement('div');
@@ -1921,6 +1969,97 @@ function showSignalPopup(el){
     <button class="close-btn" onclick="this.closest('.sig-popup-overlay').remove()">${lang==='zh'?'关闭':'Close'}</button>
   </div>`;
   document.body.appendChild(overlay);
+}
+
+// ===== RULES STATUS BAR (v3.1) =====
+// Shows compact rule status badges in the scorecard area.
+// Reads current spin data and evaluates rules inline (no P&L dependency).
+// This runs for ALL users as scorecard signals — the full blocking
+// modals/banners in layfive-rules.js only run during Live P&L sessions.
+function refreshRulesStatus(){
+  const bar=document.getElementById('rulesStatusBar');
+  if(!bar)return;
+  const n=spins.length;
+  const GRACE=12;
+  if(n<=GRACE){bar.style.display='none';return}
+
+  const badges=[];
+
+  // Compute per-element stats for rules
+  const last15=spins.slice(-15);
+  const last20=spins.slice(-20);
+
+  // Session-wide counts
+  const sessCounts={};
+  ELS.forEach(el=>{sessCounts[el]=spins.filter(x=>x.hits[el]==='s'||x.hits[el]==='sp').length});
+  const sortedEls=[...ELS].sort((a,b)=>sessCounts[b]-sessCounts[a]);
+  const sessLead=sessCounts[sortedEls[0]]-(sessCounts[sortedEls[1]]||0);
+  const sessLeader=sessLead>=1?sortedEls[0]:null;
+
+  // C1: 30 spins on top of 12 grace
+  const liveSpins=n-GRACE;
+  if(liveSpins>=30){
+    badges.push('<span style="background:#c48a1a;color:#000;padding:1px 6px;border-radius:4px;font-weight:700">C1: '+liveSpins+' spins — end session</span>');
+  }else if(liveSpins>=25){
+    badges.push('<span style="color:#c48a1a">C1: '+liveSpins+'/30 spins</span>');
+  }
+
+  // C2: leader change check (last-15 window, simplified for scorecard)
+  if(last15.length>=15){
+    const l15Counts={};
+    ELS.forEach(el=>{l15Counts[el]=last15.filter(x=>x.hits[el]==='s'||x.hits[el]==='sp').length});
+    const l15Sorted=[...ELS].sort((a,b)=>l15Counts[b]-l15Counts[a]);
+    const l15Lead=l15Counts[l15Sorted[0]]-(l15Counts[l15Sorted[1]]||0);
+    if(l15Lead>=2){
+      const elName=lang==='zh'?L[l15Sorted[0]].cn:L[l15Sorted[0]].n;
+      badges.push('<span style="color:#ff9a3c">C2: '+elName+' leads last-15 by '+l15Lead+'</span>');
+    }
+  }
+
+  // H1: check if any element the user might bet on has 4+ tail blank streak
+  // (Show for awareness — the full modal fires only in P&L mode)
+  ELS.forEach(el=>{
+    let streak=0;
+    for(let i=spins.length-1;i>=0;i--){
+      if(spins[i].hits[el]==='-')streak++;else break;
+    }
+    if(streak>=4){
+      const elName=lang==='zh'?L[el].cn:L[el].n;
+      badges.push('<span style="color:#ff3333">H1: '+elName+' missed '+streak+'x</span>');
+    }
+  });
+
+  // H2: last 20 spins never net positive (show only as info since no P&L here)
+  // Skip in scorecard-only mode — needs P&L data
+
+  // H4: 4 of 5 elements cold (4-blank streak) in last 15
+  if(last15.length>=15){
+    const coldEls=ELS.filter(el=>{
+      let run=0,max=0;
+      last15.forEach(sp=>{
+        if(sp.hits[el]==='-'){run++;if(run>max)max=run}else run=0;
+      });
+      return max>=4;
+    });
+    if(coldEls.length>=4){
+      const survivors=ELS.filter(el=>!coldEls.includes(el));
+      const survName=survivors[0]?(lang==='zh'?L[survivors[0]].cn:L[survivors[0]].n):'?';
+      badges.push('<span style="background:#6b0f0f;color:#fff;padding:1px 6px;border-radius:4px;font-weight:700">🚨 H4: 4/5 cold — survivor: '+survName+'</span>');
+    }
+  }
+
+  // Suggestion: session leader
+  if(sessLeader && sessLead>=2){
+    const elName=lang==='zh'?L[sessLeader].cn:L[sessLeader].n;
+    badges.push('<span style="color:#00e676">★ '+elName+' leads by '+sessLead+'</span>');
+  }
+
+  if(badges.length){
+    bar.style.display='';
+    bar.innerHTML=badges.join(' <span style="color:#555">·</span> ');
+  }else{
+    bar.style.display='none';
+  }
 }
 
 // ===== MOST BEHIND BANNER =====
