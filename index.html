@@ -525,6 +525,15 @@ button{font-family:inherit}
   </div>
   <div class="spin-count" id="spinCount">0 spins</div>
   <div id="restartWarn" style="display:none;margin:6px 0;padding:8px 10px;background:rgba(255,140,0,.18);border:1px solid #ff8c00;border-radius:6px;color:#ffb347;font-size:.85em;text-align:center" data-i18n="restart_warn">⚠ Approaching 60 spins — consider Restart to refresh the pattern.</div>
+  <!-- My Element selector (for lead-loss tracking without P&L) -->
+  <div id="myElPicker" style="margin:6px 0;padding:6px 8px;background:#111820;border:1px solid #333;border-radius:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+    <span style="font-size:.8em;color:#aaa;white-space:nowrap">🎯 My Element:</span>
+    <button class="my-el-btn" data-el="M"  onclick="pickMyElement('M')"  style="flex:1;min-width:50px;padding:4px 2px;border-radius:5px;border:1px solid #555;background:#1a1a2e;color:var(--m);font-size:.78em;font-weight:700;cursor:pointer">● Metal</button>
+    <button class="my-el-btn" data-el="W"  onclick="pickMyElement('W')"  style="flex:1;min-width:50px;padding:4px 2px;border-radius:5px;border:1px solid #555;background:#1a1a2e;color:var(--w);font-size:.78em;font-weight:700;cursor:pointer">▮ Wood</button>
+    <button class="my-el-btn" data-el="Wa" onclick="pickMyElement('Wa')" style="flex:1;min-width:50px;padding:4px 2px;border-radius:5px;border:1px solid #555;background:#1a1a2e;color:var(--wa);font-size:.78em;font-weight:700;cursor:pointer">~ Water</button>
+    <button class="my-el-btn" data-el="F"  onclick="pickMyElement('F')"  style="flex:1;min-width:50px;padding:4px 2px;border-radius:5px;border:1px solid #555;background:#1a1a2e;color:var(--f);font-size:.78em;font-weight:700;cursor:pointer">▲ Fire</button>
+    <button class="my-el-btn" data-el="E"  onclick="pickMyElement('E')"  style="flex:1;min-width:50px;padding:4px 2px;border-radius:5px;border:1px solid #555;background:#1a1a2e;color:var(--e);font-size:.78em;font-weight:700;cursor:pointer">■ Earth</button>
+  </div>
   <!-- Scorecard -->
   <div class="sc-wrap">
     <div id="rulesStatusBar" style="display:none;padding:4px 8px;margin:0 0 4px;border-radius:6px;background:#1a1520;border:1px solid #333;font-size:.78em;line-height:1.5;color:#ccc"></div>
@@ -1260,6 +1269,41 @@ let sessions=[];
 // but all spins remain in the array for saving/analysis.
 let _restartViewOffset=0;
 
+// Expose spins array for external scripts (layfive-pnl.js lead-loss warning, etc.)
+window._lfGetSpins=function(){return spins};
+window._lfGetRestartOffset=function(){return _restartViewOffset};
+
+// ===== MY ELEMENT SELECTOR (for lead-loss tracking without P&L) =====
+let _mySelectedElement=localStorage.getItem('lf_my_element')||null;
+
+function pickMyElement(el){
+  if(_mySelectedElement===el){
+    // Deselect
+    _mySelectedElement=null;
+    localStorage.removeItem('lf_my_element');
+  }else{
+    _mySelectedElement=el;
+    localStorage.setItem('lf_my_element',el);
+  }
+  _refreshMyElButtons();
+}
+function _refreshMyElButtons(){
+  document.querySelectorAll('.my-el-btn').forEach(function(btn){
+    var el=btn.getAttribute('data-el');
+    if(el===_mySelectedElement){
+      btn.style.border='2px solid #d4af37';
+      btn.style.background='#2a2510';
+      btn.style.boxShadow='0 0 6px rgba(212,175,55,.4)';
+    }else{
+      btn.style.border='1px solid #555';
+      btn.style.background='#1a1a2e';
+      btn.style.boxShadow='none';
+    }
+  });
+}
+// Expose for layfive-pnl.js
+window._lfGetMyElement=function(){return _mySelectedElement};
+
 // ===== INIT =====
 (function init(){
   const savedLang=localStorage.getItem('lf_lang');
@@ -1290,6 +1334,7 @@ let _restartViewOffset=0;
   document.getElementById('iDate').valueAsDate=new Date();
   buildNumPopup();
   applyI18n();
+  _refreshMyElButtons();
   refreshAll();
 })();
 
@@ -1721,9 +1766,15 @@ function refreshScorecard(){
   const warnEl=document.getElementById('restartWarn');
   if(warnEl){warnEl.style.display=(sinceRestart>=55)?'block':'none';}
 
-  const totalRows=spins.length+EMPTY_ROWS;
   const tb=document.getElementById('scBody');
   tb.innerHTML='';
+
+  // When restart is active, only show spins from the restart offset onward.
+  // Pre-restart spins are hidden (but still in memory for data/analysis).
+  const viewStart=_restartViewOffset>0?_restartViewOffset:0;
+  const visibleSpins=spins.slice(viewStart);
+  const visibleCount=visibleSpins.length;
+  const totalRows=visibleCount+EMPTY_ROWS;
 
   const cnt={},cntS={},cntSp={};
   ELS.forEach(el=>{cnt[el]=0;cntS[el]=0;cntSp[el]=0});
@@ -1733,20 +1784,15 @@ function refreshScorecard(){
 
   for(let r=1;r<=totalRows;r++){
     const tr=document.createElement('tr');
-    const sp=spins[r-1];
+    const sp=visibleSpins[r-1];
 
     if(sp){
-      // Insert restart separator if this spin was a restart point
-      if(sp._restartMarker){
-        const sep=document.createElement('tr');
-        sep.innerHTML='<td colspan="7" style="background:#ff8c00;color:#fff;text-align:center;font-size:.7em;font-weight:700;padding:2px 0">⟳ RESTART — spins above continue in same session</td>';
-        tb.appendChild(sep);
-      }
       // Filled row
       const numCls=sp.num===0?'sn-g':RED.includes(sp.num)?'sn-r':'sn-b';
       const isLED=r<=LED_COUNT;
       if(isLED)tr.classList.add('led-row');
-      let rowH=`<td class="rn">${r}${isLED?'<span style="font-size:.6em;color:#888">L</span>':''}</td><td class="sn ${numCls}" id="s${r}">${sp.num}</td>`;
+      const actualIdx=viewStart+r; // actual spins index for scroll targeting
+      let rowH=`<td class="rn">${r}${isLED?'<span style="font-size:.6em;color:#888">L</span>':''}</td><td class="sn ${numCls}" id="s${actualIdx}">${sp.num}</td>`;
       ELS.forEach(el=>{
         const type=sp.hits[el];
         let cellContent='';
@@ -1757,8 +1803,10 @@ function refreshScorecard(){
       tr.innerHTML=rowH;
     }else{
       // Empty row — tappable Drop cell + strategy signals on first empty row
-      const isSignalRow=(r===spins.length+1 && spins.length>=5);
-      let rowH=`<td class="rn">${r}</td><td class="sn empty" id="s${r}" onclick="openNumPopup(${r})"></td>`;
+      const isSignalRow=(r===visibleCount+1 && visibleCount>=5);
+      // Map visible row back to actual spins index for addSpin
+      const actualRow=viewStart+r;
+      let rowH=`<td class="rn">${r}</td><td class="sn empty" id="s${actualRow}" onclick="openNumPopup(${actualRow})"></td>`;
       ELS.forEach(el=>{
         if(isSignalRow && signals[el]){
           const sig=signals[el];
@@ -4230,7 +4278,7 @@ function exportReportsExcel(){
   XLSX.writeFile(wb,'LayFive_Report_'+new Date().toISOString().substring(0,10)+'.xlsx');
 }
 </script>
-<script src="layfive-pnl.js?v=7"></script>
+<script src="layfive-pnl.js?v=8"></script>
 <script src="layfive-group.js?v=6"></script>
 <script src="layfive-rules.js?v=3"></script>
 <script src="layfive-ocr.js?v=9"></script>

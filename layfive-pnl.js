@@ -403,6 +403,9 @@
           injectColumn();
         }
       } catch (e) { console.warn('[pnl] update failed', e); }
+      // Lead-loss check runs on EVERY spin — uses pnl.element if P&L active,
+      // otherwise uses the manually selected element from the scorecard picker.
+      try { checkLeadLoss(); } catch (e) { console.warn('[pnl] lead-loss check failed', e); }
       return res;
     };
     return true;
@@ -449,6 +452,114 @@
     btn.textContent = '💰 P&L';
     btn.onclick = function () { openSetupModal(false); };
     bar.appendChild(btn);
+  }
+
+  // ========== LEAD-LOSS WARNING (Premium / Live P&L) ==========
+  // Rolling last-20 check: if another element takes a 2-spin lead over the
+  // player's selected element, pop up a warning so they can Restart and
+  // follow the new leader.  Completely separate from C2 rule logic.
+  var _leadLossDismissed = false;  // reset each time a new leader emerges
+
+  function checkLeadLoss() {
+    // Determine which element the player is tracking:
+    // 1) If P&L is active, use pnl.element
+    // 2) Otherwise, use the manually selected element from the scorecard picker
+    var trackedEl = null;
+    if (pnl.active && pnl.element) {
+      trackedEl = pnl.element;
+    } else if (typeof window._lfGetMyElement === 'function') {
+      trackedEl = window._lfGetMyElement();
+    }
+    if (!trackedEl) return;
+
+    var getSpins = window._lfGetSpins;
+    if (typeof getSpins !== 'function') return;
+    var allSpins = getSpins();
+    if (!allSpins || allSpins.length < 12) return;
+
+    // Respect restart offset — only look at visible spins
+    var offset = (typeof window._lfGetRestartOffset === 'function') ? window._lfGetRestartOffset() : 0;
+    var visible = offset > 0 ? allSpins.slice(offset) : allSpins;
+    if (visible.length < 12) return;
+
+    // Take the last 20 of visible spins
+    var window20 = visible.slice(-20);
+
+    // Count hits per element in the window
+    var counts = {};
+    ELS.forEach(function (el) { counts[el] = 0; });
+    window20.forEach(function (sp) {
+      ELS.forEach(function (el) {
+        if (sp.hits && sp.hits[el] && sp.hits[el] !== '-') counts[el]++;
+      });
+    });
+
+    var myCount = counts[trackedEl] || 0;
+
+    // Find the leader that isn't the player's element
+    var topEl = null, topCount = 0;
+    ELS.forEach(function (el) {
+      if (el !== trackedEl && counts[el] > topCount) {
+        topCount = counts[el];
+        topEl = el;
+      }
+    });
+
+    // Warn when ANY other element takes a lead (gap >= 1) over the tracked element
+    var gap = topCount - myCount;
+    if (gap >= 1 && topEl && !_leadLossDismissed) {
+      showLeadLossWarning(topEl, topCount, myCount, gap, trackedEl);
+    }
+    // Reset dismissed flag when no one leads anymore (so it fires again next time a new leader appears)
+    if (gap < 1) _leadLossDismissed = false;
+  }
+
+  function showLeadLossWarning(leaderEl, leaderCount, myCount, gap, trackedEl) {
+    // Don't stack multiple warnings
+    if (document.getElementById('lead-loss-overlay')) return;
+    _leadLossDismissed = true;
+
+    var leaderName = EL_NAMES[leaderEl] || leaderEl;
+    var myName = EL_NAMES[trackedEl] || trackedEl;
+
+    var overlay = document.createElement('div');
+    overlay.id = 'lead-loss-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:10000;display:flex;align-items:center;justify-content:center;padding:12px';
+
+    var box = document.createElement('div');
+    box.style.cssText = 'background:#1a1f2e;border:2px solid #ff4444;border-radius:12px;padding:20px;width:100%;max-width:320px;color:#eee;text-align:center';
+    box.innerHTML =
+      '<div style="font-size:2em;margin-bottom:8px">⚠️</div>' +
+      '<h3 style="color:#ff4444;margin:0 0 10px">Lead Lost!</h3>' +
+      '<p style="font-size:.95em;line-height:1.5;margin:0 0 12px">' +
+        '<b style="color:#ff9a3c">' + leaderName + '</b> now leads the last 20 spins with <b>' + leaderCount + ' hits</b>.<br>' +
+        'Your element <b style="color:#d4af37">' + myName + '</b> has <b>' + myCount + ' hits</b>.<br>' +
+        '<span style="color:#ff4444;font-weight:700">Gap: ' + gap + ' spins behind.</span>' +
+      '</p>' +
+      '<p style="font-size:.85em;color:#aaa;margin:0 0 14px">Consider hitting <b>Restart</b> to hunt for a new 2-spin leader.</p>' +
+      '<div style="display:flex;gap:8px">' +
+        '<button id="ll-dismiss" style="flex:1;padding:10px;background:#444;color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer">Got it</button>' +
+        '<button id="ll-restart" style="flex:1;padding:10px;background:linear-gradient(135deg,#ff8c00,#cc4400);color:#fff;border:none;border-radius:6px;font-weight:700;cursor:pointer">⟳ Restart</button>' +
+      '</div>';
+
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    document.getElementById('ll-dismiss').onclick = function () {
+      overlay.remove();
+    };
+    document.getElementById('ll-restart').onclick = function () {
+      overlay.remove();
+      // Trigger the app's restart function
+      if (typeof window.restartSess === 'function') {
+        window.restartSess();
+      }
+    };
+
+    // Also close on overlay tap outside the box
+    overlay.onclick = function (ev) {
+      if (ev.target === overlay) overlay.remove();
+    };
   }
 
   function init() {
