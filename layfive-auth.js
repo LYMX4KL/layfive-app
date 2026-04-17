@@ -20,8 +20,8 @@
   'use strict';
 
   // Supabase config — uses the same project as the website
-  var SUPABASE_URL = 'https://YOUR_SUPABASE_URL.supabase.co';  // TODO: Replace with actual URL
-  var SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';            // TODO: Replace with actual key
+  var SUPABASE_URL = 'https://xkcglcxhkxpvtumorcki.supabase.co';
+  var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhrY2dsY3hoa3hwdnR1bW9yY2tpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NzE1MDMsImV4cCI6MjA5MTI0NzUwM30.mFp4ippFLpXxcPq6AjBscm-Pk4Z0VZIoZvhce0ki8vE';
 
   var _supabase = null;
   var _user = null;
