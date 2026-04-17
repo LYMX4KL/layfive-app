@@ -1,18 +1,33 @@
 /* =========================================================================
  * layfive-rules.js — anti-tilt suggestion / caution / hard-stop engine
  * -------------------------------------------------------------------------
- * Ruleset v2 (2026-04-14, H5 widened to 20 spins 2026-04-15). See ANTI_TILT_RULES.md for full spec.
+ * Ruleset v3.1 (2026-04-16). Data-validated against 115 sessions / 4,352 spins.
  *
  * Runs only when a live P&L session is active (lf_pnl_session_v1 with
  * active:true). After each spin (we hook refreshAll), we evaluate metrics
  * against three tiers of rules:
- *   - suggestion     (informational, shown on Switch / pre-session UI)
- *   - caution        (non-blocking banner at top of Scorecard)
- *   - hard-stop      (blocking modal with End / Override choice)
+ *   - suggestion     (green star — element with session-wide lead >= 2)
+ *   - caution        (non-blocking banner — C1, C2, C3)
+ *   - hard-stop      (blocking modal — H1, H2, H4)
+ *
+ * Grace period: First 12 spins are pre-existing casino scoreboard data.
+ * NO rules fire during grace period.
  *
  * Windows:
- *   - Session window  = pnl.history (every spin tracked since live P&L start)
- *   - Last-12 window  = the most recent 12 entries of pnl.history
+ *   - Session window  = all spins including pre-existing board records
+ *   - Last-15 window  = scorecard signals, C2, C3, H4
+ *   - Last-20 window  = C2, C3, H2
+ *   - Last-25 window  = C2, C3
+ *
+ * Changes from v2:
+ *   - H3 removed (covered by C2 rolling checks)
+ *   - H5 removed (covered by C2 rolling checks)
+ *   - C1 lowered from 35 to 30 spins on top of 12 grace
+ *   - C2 deduplicated: fires once per new leader, auto-dismisses until
+ *     a different element takes lead (-90% alert noise)
+ *   - C2 checks rolling at last-15/20/25 windows
+ *   - H4 uses last-15 window (streak-4)
+ *   - Suggestion: wait for lead >= 2 to emerge naturally (avg spin 19)
  *
  * Dependencies (defined by index.html and layfive-pnl.js):
  *   - window.hitType(num, el)
@@ -117,21 +132,31 @@
     return false;
   }
 
-  // ---------- Rule evaluation ----------
-  // Returns array of { id, severity, msg, actions } — we'll pick the highest.
+  // ---------- Rule evaluation (v3.1) ----------
+  // Returns array of { id, severity, msg } — caller picks the highest.
+  var GRACE_SPINS = 12; // first 12 spins = pre-existing board data, no rules fire
+
   function evaluate(pnl, entries) {
     var triggers = [];
     if (!pnl.active || !pnl.element) return triggers;
+
+    // Grace period: no rules during the initial 12 board-input spins
+    if (entries.length <= GRACE_SPINS) return triggers;
+
     var sel = pnl.element;
-    var last12 = entries.slice(-12);
+    var last15 = entries.slice(-15);
+    var last20 = entries.slice(-20);
+    var last25 = entries.slice(-25);
     var leadAll = leaderOf(entries);
-    var lead12 = leaderOf(last12);
+    var lead15 = leaderOf(last15);
     var unitCost = (pnl.unitCount || 0) * (pnl.unitValue || 0) * 15; // bet per spin
     var remaining = (pnl.startBankroll || 0) + (pnl.netPL || 0);
     var selTailStreak = tailBlankStreak(entries, sel);
 
-    // --- HARD STOPS ---
-    // H1: selected element lost 4 in a row (most recent)
+    // === HARD STOPS (blocking modal, Premium) ===
+
+    // H1: Selected element lost 4 in a row (tail streak).
+    // Override logged + visible on scorecard restore.
     if (selTailStreak >= 4) {
       triggers.push({
         id: 'H1_streak4',
@@ -141,109 +166,80 @@
              ' spins in a row. Per rule, stop betting now.',
       });
     }
-    // H2: 20 spins with back-and-forth, no net ahead in last 20
+
+    // H2: Last 20 spins, net P&L never positive. No momentum — stop.
     if (entries.length >= 20) {
-      var last20 = entries.slice(-20);
       if (!hasAnyPositiveNet(last20)) {
         triggers.push({
           id: 'H2_nomomentum20',
           severity: 'hard',
           title: 'Hard stop: 20 spins, never net ahead',
-          msg: 'Over the last 20 spins the net P&L never went positive. Back-and-forth with no momentum — stop.',
-        });
-      }
-    }
-    // H3: 2+ co-leaders, OR selected element lost the lead
-    if (lead12.coLeaders.length >= 2) {
-      triggers.push({
-        id: 'H3_coleaders',
-        severity: 'hard',
-        title: 'Hard stop: co-leaders detected',
-        msg: 'In the last 12 spins ' + lead12.coLeaders.length + ' elements are tied for the lead (' +
-             lead12.coLeaders.map(function (e) { return EL_NAMES[e]; }).join(', ') +
-             '). No clear leader — stop.',
-      });
-    } else if (lead12.leader && lead12.leader !== sel) {
-      triggers.push({
-        id: 'H3_lostlead',
-        severity: 'hard',
-        title: 'Hard stop: selected lost the lead',
-        msg: 'In the last 12 spins <b>' + EL_NAMES[lead12.leader] + '</b> has taken the lead over your selected <b>' +
-             EL_NAMES[sel] + '</b>. Stop.',
-      });
-    }
-    // H5: 2+ elements each pulled 2+ spins ahead of the selected in the last 20.
-    //     No clear single challenger to switch to → stop.
-    //     (Uses a wider 20-spin window than other lead rules to reduce noise.)
-    var last20ForH5 = entries.slice(-20);
-    var lead20H5 = leaderOf(last20ForH5);
-    var passers = ELS.filter(function (el) {
-      if (el === sel) return false;
-      return lead20H5.counts[el] - lead20H5.counts[sel] >= 2;
-    });
-    if (passers.length >= 2) {
-      triggers.push({
-        id: 'H5_multipassers',
-        severity: 'hard',
-        title: 'Hard stop: multiple elements passed yours',
-        msg: passers.map(function (e) { return EL_NAMES[e]; }).join(', ') +
-             ' are each 2+ spins ahead of your selected <b>' + EL_NAMES[sel] +
-             '</b> in the last 20 spins. No single clear new leader — stop now.',
-      });
-    }
-    // H4: 4 of 5 elements each have 4-blank streaks in last 12, and the 1 remaining isn't the current leader
-    var with4Blanks = ELS.filter(function (el) { return hasBlankStreak(last12, el, 4); });
-    if (with4Blanks.length >= 4) {
-      var remaining1 = ELS.filter(function (el) { return with4Blanks.indexOf(el) < 0; });
-      var theOne = remaining1[0] || null;
-      if (theOne && lead12.leader !== theOne) {
-        triggers.push({
-          id: 'H4_4of5cold',
-          severity: 'hard',
-          title: 'Hard stop: 4 of 5 elements cold',
-          msg: '4 of the 5 elements each had a 4-blank streak in the last 12 spins, and the remaining one (<b>' +
-               EL_NAMES[theOne] + '</b>) isn\'t the current leader. Stop.',
+          msg: 'Over the last 20 spins the net P&L never went positive. No momentum — stop.',
         });
       }
     }
 
-    // --- CAUTIONS ---
-    // C1: 35 spins played — end session regardless of W/L
-    if (entries.length >= 35) {
+    // H4: ABSOLUTE HARD STOP — 4 of 5 elements cold (4-blank streak) in
+    // last 15, and the 1 survivor is NOT leading. Strongest warning.
+    if (entries.length >= 15) {
+      var with4Blanks = ELS.filter(function (el) { return hasBlankStreak(last15, el, 4); });
+      if (with4Blanks.length >= 4) {
+        var survivors = ELS.filter(function (el) { return with4Blanks.indexOf(el) < 0; });
+        var theOne = survivors[0] || null;
+        if (theOne && lead15.leader !== theOne) {
+          triggers.push({
+            id: 'H4_4of5cold',
+            severity: 'hard',
+            title: '🚨 ABSOLUTE HARD STOP: 4 of 5 elements cold',
+            msg: '4 of the 5 elements each had a 4-blank streak in the last 15 spins, and the survivor (<b>' +
+                 EL_NAMES[theOne] + '</b>) isn\'t leading. This is the strongest warning — stop immediately.',
+          });
+        }
+      }
+    }
+
+    // (H3 removed in v3.1 — covered by C2 rolling checks)
+    // (H5 removed in v3.1 — covered by C2 rolling checks)
+
+    // === CAUTION RULES (non-blocking banner, Premium) ===
+
+    // C1: 30 spins on top of the initial 12 grace → end session.
+    // (30 + 12 = 42 total entries)
+    if (entries.length >= GRACE_SPINS + 30) {
       triggers.push({
-        id: 'C1_35spins',
+        id: 'C1_30spins',
         severity: 'caution',
-        title: '35 spins reached',
-        msg: 'You\'ve played 35 spins this session. End it regardless of W/L.',
+        title: '30 spins reached — end session',
+        msg: 'You\'ve played ' + (entries.length - GRACE_SPINS) + ' spins on top of the initial 12. End the session regardless of W/L.',
       });
     }
-    // C2: Any element is 2+ ahead of any other element in the last-12 window,
-    //     and the new leader is NOT the currently selected one. Action depends
-    //     on whether the player is up:
-    //       - up (netPL > 0)      → suggest SWITCH to the new leader
-    //       - not up (netPL <= 0) → suggest STOP
-    //     Never "stay on selected" — that's the point of the rule.
-    if (lead12.leader && lead12.lead >= 2 && lead12.leader !== sel) {
-      var newLeader = lead12.leader;
+
+    // C2: Rolling dedup check at last-15/20/25 windows.
+    // Fire ONCE when a new element takes a 2-spin lead in ANY window.
+    // Auto-dismiss until a DIFFERENT element takes over.
+    // Suggest cover/stop/change depending on player's net P&L.
+    var c2Leader = _c2CheckWindows(pnl, sel, last15, last20, last25);
+    if (c2Leader) {
       var isUp = (pnl.netPL || 0) > 0;
       var canAfford4 = remaining >= 4 * unitCost;
-      var msg;
+      var c2msg;
       if (isUp) {
-        msg = 'You\'re up, and <b>' + EL_NAMES[newLeader] + '</b> is 2+ ahead in the last 12 spins. ' +
-              'Switch to <b>' + EL_NAMES[newLeader] + '</b>' +
-              (canAfford4 ? '.' : ' (reduce bet so 4 more spins are possible — do not refill).');
+        c2msg = 'You\'re up, and <b>' + EL_NAMES[c2Leader] + '</b> has taken a 2+ spin lead. ' +
+                'Consider switching to <b>' + EL_NAMES[c2Leader] + '</b> or stopping to lock gains' +
+                (canAfford4 ? '.' : ' (reduce bet so 4 more spins are possible — do not refill).');
       } else {
-        msg = '<b>' + EL_NAMES[newLeader] + '</b> is 2+ ahead in the last 12 spins and you\'re not up yet. ' +
-              'Stop now.' + (canAfford4 ? '' : ' Bankroll can\'t cover 4 more spins anyway.');
+        c2msg = '<b>' + EL_NAMES[c2Leader] + '</b> has a 2+ spin lead and you\'re not up yet. ' +
+                'Stop now.' + (canAfford4 ? '' : ' Bankroll can\'t cover 4 more spins anyway.');
       }
       triggers.push({
-        id: 'C2_leadchange_' + (isUp ? 'up' : 'down') + '_' + newLeader,
+        id: 'C2_leadchange_' + c2Leader,
         severity: 'caution',
-        title: isUp ? 'Switch to new leader' : 'Stop — you\'re not up',
-        msg: msg,
+        title: isUp ? 'New leader — switch or stop' : 'New leader — stop',
+        msg: c2msg,
       });
     }
-    // C3: Win ≥ 100% with lead still 2–5, suggest lowering bet to lock 100% gain
+
+    // C3: Net P&L ≥ 100% of bankroll, lead 2–5 → lower bet to lock gain.
     if (pnl.startBankroll && pnl.netPL >= pnl.startBankroll) {
       if (leadAll.leader === sel && leadAll.lead >= 2 && leadAll.lead <= 5) {
         triggers.push({
@@ -256,10 +252,49 @@
       }
     }
 
-    // --- SUGGESTIONS (informational — shown pre-session / in Switch modal) ---
-    // (Kept lightweight; UI currently shows these only when user opens Switch.)
+    // === SUGGESTIONS (informational — green star on element with lead >= 2) ===
+    // Wait for lead >= 2 to emerge naturally. Mark X if 4 blanks in last 15.
+    // (Suggestion display handled by index.html computeSignals, not modal/banner.)
+    if (leadAll.leader && leadAll.lead >= 2) {
+      triggers.push({
+        id: 'SUG_leader_' + leadAll.leader,
+        severity: 'suggestion',
+        title: 'Suggested element: ' + EL_NAMES[leadAll.leader],
+        msg: '<b>' + EL_NAMES[leadAll.leader] + '</b> leads by ' + leadAll.lead +
+             ' in the session. Consider this element.',
+      });
+    }
 
     return triggers;
+  }
+
+  // C2 dedup helper: check rolling windows for a new leader with lead >= 2
+  // that is NOT the selected element. Returns the new leader element key,
+  // or null if no alert should fire.
+  // Dedup: only fires when the leader is DIFFERENT from the last one we alerted on.
+  // The last alerted leader is stored in pnl._c2LastAlerted.
+  function _c2CheckWindows(pnl, sel, last15, last20, last25) {
+    var windows = [last15];
+    if (last20.length >= 20) windows.push(last20);
+    if (last25.length >= 25) windows.push(last25);
+
+    var newLeader = null;
+    for (var i = 0; i < windows.length; i++) {
+      var info = leaderOf(windows[i]);
+      if (info.leader && info.lead >= 2 && info.leader !== sel) {
+        newLeader = info.leader;
+        break; // smallest window wins (most recent signal)
+      }
+    }
+    if (!newLeader) return null;
+
+    // Dedup: if we already alerted on this same leader, don't fire again
+    if (pnl._c2LastAlerted === newLeader) return null;
+
+    // New leader detected — record it and fire
+    pnl._c2LastAlerted = newLeader;
+    writePnl(pnl);
+    return newLeader;
   }
 
   // ---------- Override memory ----------

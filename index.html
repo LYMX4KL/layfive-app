@@ -939,8 +939,8 @@ const T = {
   ref_extra_cover: {en:'Coverage', zh:'覆盖'},
   ref_extra_splits: {en:'All Splits', zh:'所有分注'},
   restart_warn: {en:'⚠ Approaching 60 spins — consider Restart to refresh the pattern.', zh:'⚠ 接近60次旋转 — 考虑重启以刷新模式。'},
-  restart_confirm: {en:'Restart session? Current spins will be archived to Sessions tab, and a new session will start with the last 12 spins.', zh:'重启场次？当前旋转将归档到场次标签页，新场次将以最后12次旋转开始。'},
-  restart_done: {en:'Session restarted. Last 12 spins are now the start of your new session.', zh:'场次已重启。最后12次旋转现在是新场次的开始。'},
+  restart_confirm: {en:'Restart view? Your spins stay in the same session. The scorecard will reset to show the last 12 spins as your new starting point.', zh:'重置视图？旋转数据保留在同一场次中。记分卡将重置，以最后12次旋转作为新起点。'},
+  restart_done: {en:'View restarted. All spins are kept — scorecard now shows from the last 12.', zh:'视图已重启。所有旋转数据已保留——记分卡现在从最后12次开始显示。'},
   restart_need12: {en:'Need at least 12 spins before you can restart.', zh:'需要至少12次旋转才能重启。'},
   hdr_metal: {en:'<span class="el-ic">●</span><span class="el-nm">Metal</span>', zh:'<span class="el-zh">●金</span>'},
   hdr_wood:  {en:'<span class="el-ic">▮</span><span class="el-nm">Wood</span>',  zh:'<span class="el-zh">▮木</span>'},
@@ -1422,17 +1422,24 @@ async function restartSess(){
   if(spins.length<12){alert(t('restart_need12'));return}
   if(!confirm(t('restart_confirm')))return;
 
-  // 1) Archive current session (only if it has enough spins to be meaningful)
-  if(spins.length>=25){
-    try{await saveSessSilent('restart');}catch(e){console.error('Restart archive error',e)}
+  // Restart NO LONGER archives separately — spins stay in the same session.
+  // The scorecard resets its "view" but all spins remain in memory.
+  // Only "New Session" (saveSess + clear) truly starts fresh.
+
+  // Mark the restart point so we know where the view reset happened
+  if(spins.length>0){
+    spins[spins.length-1]._restartMarker=true;
   }
 
-  // 2) Seed new session with last 12 spins
-  const tail=spins.slice(-12).map(x=>JSON.parse(JSON.stringify(x)));
-  spins=tail;
+  // Reset the scorecard view to show last 12 as the "seed" for visual tracking,
+  // but keep ALL spins in memory for session save, rules, and pool data.
+  _restartViewOffset=spins.length-12;
   refreshAll();
   alert(t('restart_done'));
 }
+// View offset: when >0, scorecard columns show only spins from this index onward,
+// but all spins remain in the array for saving/analysis.
+let _restartViewOffset=0;
 
 // Save current session without alert/validation prompts; tag with reason.
 // Helper: snapshot active P&L state for bundling into a saved session
@@ -1470,17 +1477,19 @@ async function saveSessSilent(reason){
   if(firebaseReady && currentUser){
     await db.collection('users').doc(currentUser.uid).collection('sessions').add(sess);
     await loadSessions();
-    try{await updatePoolData();}catch(e){}
   }else{
     sessions.push(sess);
     try{localStorage.setItem('lf_sess',JSON.stringify(sessions))}catch(e){}
     refreshSessions();
   }
+  // Always update pool data (works for both online and offline)
+  try{await updatePoolData();}catch(e){console.error('Pool update error',e)}
 }
 
 async function saveSess(){
   if(!spins.length){alert(t('no_spins'));return}
-  if(spins.length<25){alert(t('min_spins_warn')+ ' ('+spins.length+'/25)');return}
+  // Removed 25-spin minimum — sessions accumulate across restarts now.
+  // All spins are valuable for pooled analysis.
 
   const sess={
     date:document.getElementById('iDate').value||new Date().toISOString().slice(0,10),
@@ -1502,14 +1511,16 @@ async function saveSess(){
     try{
       await db.collection('users').doc(currentUser.uid).collection('sessions').add(sess);
       await loadSessions();
-      await updatePoolData();
-      alert(t('session_saved')+' ('+spins.length+' '+t('spins')+')');
-    }catch(e){alert('Save error: '+e.message)}
+    }catch(e){alert('Save error: '+e.message);return}
   }else{
     sessions.push(sess);
     try{localStorage.setItem('lf_sess',JSON.stringify(sessions))}catch(e){}
-    alert(t('session_saved')+' ('+spins.length+' '+t('spins')+')');
   }
+  // Pool data for ALL players (online + offline)
+  await updatePoolData();
+  alert(t('session_saved')+' ('+spins.length+' '+t('spins')+')');
+  // Reset restart view offset for next session
+  _restartViewOffset=0;
 }
 
 async function loadSessions(){
@@ -1527,9 +1538,9 @@ async function loadSessions(){
 let poolData=null;
 
 async function updatePoolData(){
-  if(!firebaseReady||!currentUser||!sessions.length)return;
-  // Analyze EACH session individually, then find patterns ACROSS sessions
-  const validSessions=sessions.filter(s=>s.spins&&s.spins.length>=25);
+  if(!sessions.length)return;
+  // Analyze ALL sessions with spin data (removed 25-spin minimum — every session is valuable)
+  const validSessions=sessions.filter(s=>s.spins&&s.spins.length>=12);
   if(!validSessions.length)return;
 
   const perSessionData=[]; // one entry per session
@@ -1642,21 +1653,32 @@ async function updatePoolData(){
     };
   });
 
-  // Save to Firestore
-  try{
-    await db.collection('users').doc(currentUser.uid).collection('pool').doc('stats').set(insights);
-  }catch(e){console.error('Pool save error',e)}
+  // Save pool data — Firestore if logged in, localStorage always
+  if(firebaseReady && currentUser){
+    try{
+      await db.collection('users').doc(currentUser.uid).collection('pool').doc('stats').set(insights);
+    }catch(e){console.error('Pool save error',e)}
+  }
+  // Always save locally so offline players have pool data too
+  try{localStorage.setItem('lf_pool_stats',JSON.stringify(insights))}catch(e){}
 
   poolData=insights;
   return insights;
 }
 
 async function loadPoolData(){
-  if(!firebaseReady||!currentUser)return null;
+  // Try Firestore first, fall back to localStorage
+  if(firebaseReady && currentUser){
+    try{
+      const doc=await db.collection('users').doc(currentUser.uid).collection('pool').doc('stats').get();
+      if(doc.exists){poolData=doc.data();return poolData}
+    }catch(e){console.error('Pool load error',e)}
+  }
+  // Fallback: load from localStorage (works for offline players)
   try{
-    const doc=await db.collection('users').doc(currentUser.uid).collection('pool').doc('stats').get();
-    if(doc.exists){poolData=doc.data();return poolData}
-  }catch(e){console.error('Pool load error',e)}
+    const local=localStorage.getItem('lf_pool_stats');
+    if(local){poolData=JSON.parse(local);return poolData}
+  }catch(e){}
   return null;
 }
 
@@ -1675,10 +1697,11 @@ function showTab(i){
 function refreshAll(){refreshScorecard();refreshAnalysis();refreshBehindBanner()}
 
 function refreshScorecard(){
-  document.getElementById('spinCount').textContent=spins.length+' '+t('spins');
-  // Show restart warning starting at spin 55
+  const sinceRestart=_restartViewOffset>0?(spins.length-_restartViewOffset):spins.length;
+  document.getElementById('spinCount').textContent=spins.length+' '+t('spins')+(_restartViewOffset>0?' (view: '+sinceRestart+')':'');
+  // Show restart warning starting at spin 55 since last restart
   const warnEl=document.getElementById('restartWarn');
-  if(warnEl){warnEl.style.display=(spins.length>=55)?'block':'none';}
+  if(warnEl){warnEl.style.display=(sinceRestart>=55)?'block':'none';}
 
   const totalRows=spins.length+EMPTY_ROWS;
   const tb=document.getElementById('scBody');
@@ -1695,6 +1718,12 @@ function refreshScorecard(){
     const sp=spins[r-1];
 
     if(sp){
+      // Insert restart separator if this spin was a restart point
+      if(sp._restartMarker){
+        const sep=document.createElement('tr');
+        sep.innerHTML='<td colspan="7" style="background:#ff8c00;color:#fff;text-align:center;font-size:.7em;font-weight:700;padding:2px 0">⟳ RESTART — spins above continue in same session</td>';
+        tb.appendChild(sep);
+      }
       // Filled row
       const numCls=sp.num===0?'sn-g':RED.includes(sp.num)?'sn-r':'sn-b';
       const isLED=r<=LED_COUNT;
