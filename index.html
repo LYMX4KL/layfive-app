@@ -17,6 +17,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
+<!-- Supabase JS (for auth & tier check) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
 <!-- Chart.js, jsPDF, SheetJS -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -507,7 +510,7 @@ button{font-family:inherit}
     <button class="btn-undo" onclick="undo()" data-i18n="btn_undo">↩ Undo</button>
     <button class="btn-new" onclick="newSess()" data-i18n="btn_new">New</button>
     <button class="btn-save" onclick="saveSess()" data-i18n="btn_save">Save Session</button>
-    <button class="btn-restart" onclick="restartSess()" data-i18n="btn_restart" style="background:linear-gradient(135deg,#ff8c00,#cc4400);color:#fff;border:1px solid #ffae42;border-radius:6px;padding:6px 10px;font-weight:700;cursor:pointer">⟳ Restart</button>
+    <button class="btn-restart" onclick="if(window._lfAuth&&!window._lfAuth.gateFeature('restart'))return;restartSess()" data-i18n="btn_restart" style="background:linear-gradient(135deg,#ff8c00,#cc4400);color:#fff;border:1px solid #ffae42;border-radius:6px;padding:6px 10px;font-weight:700;cursor:pointer">⟳ Restart</button>
     <button class="btn-ref" onclick="openReference()" data-i18n="btn_reference" style="background:linear-gradient(135deg,#1e3a8a,#0b1e4a);color:#fff;border:1px solid #4a6bd4;border-radius:6px;padding:6px 10px;font-weight:700;cursor:pointer">📖 Reference</button>
   </div>
 
@@ -1746,6 +1749,12 @@ async function loadPoolData(){
 }
 
 function showTab(i){
+  // Tier gating: tabs 1(Cover),2(Analysis),3(Sessions),5(Practice),6(W/L),7(Reports) = Pro+
+  // Tab 0(Scorecard) and 4(Profile) = Free
+  if(window._lfAuth){
+    var tabGates={1:'suggestions',2:'analysis',3:'sessions',5:'practice',6:'wl_log',7:'reports'};
+    if(tabGates[i]&&!window._lfAuth.gateFeature(tabGates[i]))return;
+  }
   document.querySelectorAll('.tab').forEach((t,j)=>t.classList.toggle('on',j===i));
   document.querySelectorAll('.pane').forEach((p,j)=>p.classList.toggle('on',j===i));
   if(i===1)initCoverTab();
@@ -4283,5 +4292,6 @@ function exportReportsExcel(){
 <script src="layfive-rules.js?v=3"></script>
 <script src="layfive-ocr.js?v=9"></script>
 <script src="layfive-learn.js?v=1"></script>
+<script src="layfive-auth.js?v=1"></script>
 </body>
 </html>

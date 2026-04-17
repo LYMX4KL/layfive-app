@@ -882,6 +882,7 @@
     // Bright, highly visible so it's hard to miss. Also prepended so it shows first.
     btn.style.cssText = 'background:linear-gradient(135deg,#f5a623,#d48506);color:#000;border:1px solid #ffc567;border-radius:6px;padding:6px 10px;font-weight:700;font-size:.9em;cursor:pointer';
     btn.onclick = function () {
+      if (window._lfAuth && !window._lfAuth.gateFeature('ocr')) return;
       var fi = document.getElementById('lfocr-file');
       if (fi) fi.click();
     };

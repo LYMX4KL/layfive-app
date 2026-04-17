@@ -450,7 +450,10 @@
     btn.id = 'pnl-btn';
     btn.style.cssText = 'background:#8a6010;color:#fff;border:1px solid #d4af37;border-radius:6px;padding:5px 10px;font-weight:700;cursor:pointer';
     btn.textContent = '💰 P&L';
-    btn.onclick = function () { openSetupModal(false); };
+    btn.onclick = function () {
+      if (window._lfAuth && !window._lfAuth.gateFeature('pnl')) return;
+      openSetupModal(false);
+    };
     bar.appendChild(btn);
   }
 

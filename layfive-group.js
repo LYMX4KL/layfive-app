@@ -103,8 +103,14 @@
       '<button id="gs-fork" style="display:none;background:#5a3a8a;color:#fff;border:1px solid #8a6acc;border-radius:6px;padding:5px 10px;font-weight:700;cursor:pointer">📋 Copy & Fork</button>' +
       '<button id="gs-leave" style="display:none;background:#6b0f0f;color:#fff;border:1px solid #c94a4a;border-radius:6px;padding:5px 10px;font-weight:700;cursor:pointer">Leave</button>';
     actions.parentNode.insertBefore(bar, actions.nextSibling);
-    document.getElementById('gs-start').onclick = startGroup;
-    document.getElementById('gs-join').onclick = joinGroup;
+    document.getElementById('gs-start').onclick = function () {
+      if (window._lfAuth && !window._lfAuth.gateFeature('group')) return;
+      startGroup();
+    };
+    document.getElementById('gs-join').onclick = function () {
+      if (window._lfAuth && !window._lfAuth.gateFeature('group')) return;
+      joinGroup();
+    };
     document.getElementById('gs-leave').onclick = leaveGroup;
     document.getElementById('gs-fork').onclick = forkFromGroup;
   }
