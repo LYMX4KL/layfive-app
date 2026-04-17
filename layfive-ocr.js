@@ -105,8 +105,10 @@
             if (v > hi) hi = v;
           }
           var range = Math.max(1, hi - lo);
-          // Pass 3: stretch + threshold at mid-tone.
-          var threshold = 140;
+          // Pass 3: stretch + threshold at midpoint.
+          // 128 = true midpoint after contrast-stretch; 140 was too aggressive
+          // and clipped digit edges on some LED boards.
+          var threshold = 128;
           for (var k = 0; k < d.length; k += 4) {
             var src = invert ? (255 - d[k]) : d[k];
             var stretched = Math.round(((src - lo) / range) * 255);
@@ -397,16 +399,24 @@
       });
     }
 
-    // Rebuild insert bars so there's exactly one above each row + one at the bottom.
-    function rebuildInsertBars() {
-      // Remove existing bars
-      rowsContainer.querySelectorAll('.lfocr-insert').forEach(function (b) { b.remove(); });
+    // Completely rebuild the list from the current row data.
+    // This avoids all DOM ordering bugs with interleaved insert bars.
+    function fullRebuild() {
+      // Collect current values
       var rows = Array.prototype.slice.call(rowsContainer.querySelectorAll('.lfocr-row'));
-      rows.forEach(function (row) {
-        rowsContainer.insertBefore(buildInsertBar(), row);
+      var values = rows.map(function (r) {
+        var inp = r.querySelector('input');
+        return inp ? parseInt(inp.value, 10) || 0 : 0;
       });
-      // Trailing bar (so user can also insert at the very end)
+      // Clear and rebuild
+      rowsContainer.innerHTML = '';
+      values.forEach(function (v) {
+        rowsContainer.appendChild(buildInsertBar());
+        rowsContainer.appendChild(buildRow(v));
+      });
       rowsContainer.appendChild(buildInsertBar());
+      renumberRows();
+      bindHandlers();
     }
 
     function bindHandlers() {
@@ -414,8 +424,15 @@
         btn.onclick = function () {
           var row = btn.closest('.lfocr-row');
           if (!row) return;
-          row.remove();
-          rebuildInsertBars();
+          // Get values, remove this one, rebuild
+          var rows = Array.prototype.slice.call(rowsContainer.querySelectorAll('.lfocr-row'));
+          var idx = rows.indexOf(row);
+          if (idx < 0) return;
+          var values = rows.map(function (r) { var inp = r.querySelector('input'); return inp ? parseInt(inp.value, 10) || 0 : 0; });
+          values.splice(idx, 1);
+          rowsContainer.innerHTML = '';
+          values.forEach(function (v) { rowsContainer.appendChild(buildInsertBar()); rowsContainer.appendChild(buildRow(v)); });
+          rowsContainer.appendChild(buildInsertBar());
           renumberRows();
           bindHandlers();
         };
@@ -427,10 +444,17 @@
           var rows = Array.prototype.slice.call(rowsContainer.querySelectorAll('.lfocr-row'));
           var idx = rows.indexOf(row);
           if (idx <= 0) return;
-          rowsContainer.insertBefore(row, rows[idx - 1]);
-          rebuildInsertBars();
+          // Swap values and rebuild
+          var values = rows.map(function (r) { var inp = r.querySelector('input'); return inp ? parseInt(inp.value, 10) || 0 : 0; });
+          var tmp = values[idx]; values[idx] = values[idx - 1]; values[idx - 1] = tmp;
+          rowsContainer.innerHTML = '';
+          values.forEach(function (v) { rowsContainer.appendChild(buildInsertBar()); rowsContainer.appendChild(buildRow(v)); });
+          rowsContainer.appendChild(buildInsertBar());
           renumberRows();
           bindHandlers();
+          // Scroll the moved row into view
+          var newRows = rowsContainer.querySelectorAll('.lfocr-row');
+          if (newRows[idx - 1]) newRows[idx - 1].scrollIntoView({ block: 'nearest' });
         };
       });
       rowsContainer.querySelectorAll('.lfocr-row-down').forEach(function (btn) {
@@ -440,23 +464,39 @@
           var rows = Array.prototype.slice.call(rowsContainer.querySelectorAll('.lfocr-row'));
           var idx = rows.indexOf(row);
           if (idx < 0 || idx >= rows.length - 1) return;
-          rowsContainer.insertBefore(rows[idx + 1], row);
-          rebuildInsertBars();
+          var values = rows.map(function (r) { var inp = r.querySelector('input'); return inp ? parseInt(inp.value, 10) || 0 : 0; });
+          var tmp = values[idx]; values[idx] = values[idx + 1]; values[idx + 1] = tmp;
+          rowsContainer.innerHTML = '';
+          values.forEach(function (v) { rowsContainer.appendChild(buildInsertBar()); rowsContainer.appendChild(buildRow(v)); });
+          rowsContainer.appendChild(buildInsertBar());
           renumberRows();
           bindHandlers();
+          var newRows = rowsContainer.querySelectorAll('.lfocr-row');
+          if (newRows[idx + 1]) newRows[idx + 1].scrollIntoView({ block: 'nearest' });
         };
       });
       rowsContainer.querySelectorAll('.lfocr-insert-btn').forEach(function (btn) {
         btn.onclick = function () {
           var bar = btn.closest('.lfocr-insert');
           if (!bar) return;
-          var newRow = buildRow(0);
-          rowsContainer.insertBefore(newRow, bar.nextSibling);
-          rebuildInsertBars();
+          // Find which position this insert bar is at
+          var allBars = Array.prototype.slice.call(rowsContainer.querySelectorAll('.lfocr-insert'));
+          var barIdx = allBars.indexOf(bar);
+          var rows = Array.prototype.slice.call(rowsContainer.querySelectorAll('.lfocr-row'));
+          var values = rows.map(function (r) { var inp = r.querySelector('input'); return inp ? parseInt(inp.value, 10) || 0 : 0; });
+          // Insert at barIdx position (bar 0 = before first row, bar 1 = after first row, etc.)
+          values.splice(barIdx, 0, 0);
+          rowsContainer.innerHTML = '';
+          values.forEach(function (v) { rowsContainer.appendChild(buildInsertBar()); rowsContainer.appendChild(buildRow(v)); });
+          rowsContainer.appendChild(buildInsertBar());
           renumberRows();
           bindHandlers();
-          var inp = newRow.querySelector('input');
-          if (inp) { inp.focus(); inp.select(); }
+          // Focus the new row's input
+          var newRows = rowsContainer.querySelectorAll('.lfocr-row');
+          if (newRows[barIdx]) {
+            var inp = newRows[barIdx].querySelector('input');
+            if (inp) { inp.focus(); inp.select(); }
+          }
         };
       });
     }
@@ -464,20 +504,27 @@
     // Initial population
     rowsContainer.innerHTML = '';
     numbers.forEach(function (n) {
+      rowsContainer.appendChild(buildInsertBar());
       rowsContainer.appendChild(buildRow(n));
     });
-    rebuildInsertBars();
+    rowsContainer.appendChild(buildInsertBar());
     renumberRows();
     bindHandlers();
 
     document.getElementById('lfocr-add-row').onclick = function () {
-      var newRow = buildRow(0);
-      rowsContainer.appendChild(newRow);
-      rebuildInsertBars();
+      // Collect existing values, add a 0 at the end, rebuild
+      var rows = Array.prototype.slice.call(rowsContainer.querySelectorAll('.lfocr-row'));
+      var values = rows.map(function (r) { var inp = r.querySelector('input'); return inp ? parseInt(inp.value, 10) || 0 : 0; });
+      values.push(0);
+      rowsContainer.innerHTML = '';
+      values.forEach(function (v) { rowsContainer.appendChild(buildInsertBar()); rowsContainer.appendChild(buildRow(v)); });
+      rowsContainer.appendChild(buildInsertBar());
       renumberRows();
       bindHandlers();
-      var inp = newRow.querySelector('input');
-      if (inp) inp.focus();
+      // Focus the new last row's input
+      var newRows = rowsContainer.querySelectorAll('.lfocr-row');
+      var lastRow = newRows[newRows.length - 1];
+      if (lastRow) { var inp = lastRow.querySelector('input'); if (inp) { inp.focus(); inp.select(); } }
     };
 
     document.getElementById('lfocr-confirm-cancel').onclick = closeAllOcr;
