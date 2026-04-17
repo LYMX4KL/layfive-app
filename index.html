@@ -626,6 +626,13 @@ button{font-family:inherit}
       <p style="font-size:.75em;color:var(--dim);margin-bottom:5px">After an element gets lead ≥ 2 (★ suggestion): how many spins profitable? Units W/L tracking.</p>
       <div id="aLeaderProfit"></div>
     </div>
+
+    <!-- 5. AI Insights (Rule Performance + Patterns + Coaching) -->
+    <div class="acard">
+      <h3>🧠 AI Insights</h3>
+      <p style="font-size:.75em;color:var(--dim);margin-bottom:5px">Rule accuracy, discovered patterns, and personalized coaching — all learned from your session data.</p>
+      <div id="aAiInsights"></div>
+    </div>
   </div>
 </div>
 
@@ -1491,6 +1498,8 @@ async function saveSessSilent(reason){
   }
   // Always update pool data (works for both online and offline)
   try{await updatePoolData();}catch(e){console.error('Pool update error',e)}
+  // AI Learning: record rule outcomes for this session
+  try{if(window._lfLearn)window._lfLearn.recordSession(sess)}catch(e){console.warn('Learn record error',e)}
 }
 
 async function saveSess(){
@@ -1525,6 +1534,8 @@ async function saveSess(){
   }
   // Pool data for ALL players (online + offline)
   await updatePoolData();
+  // AI Learning: record rule outcomes for this session
+  try{if(window._lfLearn)window._lfLearn.recordSession(sess)}catch(e){console.warn('Learn record error',e)}
   alert(t('session_saved')+' ('+spins.length+' '+t('spins')+')');
   // Reset restart view offset for next session
   _restartViewOffset=0;
@@ -2333,6 +2344,18 @@ function refreshAnalysis(){
     </table>`;
   }
   document.getElementById('aLeaderProfit').innerHTML=lpH;
+
+  // ===== AI INSIGHTS (layfive-learn.js) =====
+  var aiEl=document.getElementById('aAiInsights');
+  if(aiEl && window._lfLearn){
+    try{
+      var aiStats=window._lfLearn.runFullAnalysis(pooled);
+      aiEl.innerHTML=window._lfLearn.renderInsightsHTML(aiStats,lang);
+    }catch(e){
+      console.warn('[learn] AI insights error',e);
+      aiEl.innerHTML='<span style="color:var(--dim);font-size:.85em">AI analysis error</span>';
+    }
+  }
 }
 
 // ===== SESSIONS TAB =====
@@ -4211,5 +4234,6 @@ function exportReportsExcel(){
 <script src="layfive-group.js?v=6"></script>
 <script src="layfive-rules.js?v=3"></script>
 <script src="layfive-ocr.js?v=9"></script>
+<script src="layfive-learn.js?v=1"></script>
 </body>
 </html>
