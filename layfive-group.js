@@ -14,14 +14,14 @@
  */
 (function () {
   'use strict';
- 
+
   var SB_URL = 'https://xkcglcxhkxpvtumorcki.supabase.co';
   var SB_KEY = 'sb_publishable_PhD96K8thW97356rT7VmDA_75mEruoY';
   var LS_CID = 'lf_client_id';
   var ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   var HOST_POLL_MS = 1200;     // host: how often to check for new local spins to publish
   var VIEWER_POLL_MS = 3500;   // viewer: how often to poll as realtime fallback
- 
+
   var sb = null;
   var state = {
     role: null,          // 'host' | 'viewer' | null
@@ -37,7 +37,7 @@
     forked: false,       // viewer: true once they fork to local session
     applyingRemote: false
   };
- 
+
   function uuid() {
     if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
@@ -69,7 +69,7 @@
     if (sb) return Promise.resolve(sb);
     return loadSB().then(function (lib) { sb = lib.createClient(SB_URL, SB_KEY); return sb; });
   }
- 
+
   // ---------- Non-blocking banner ----------
   function showBanner(html, tone) {
     var b = document.getElementById('gs-banner');
@@ -85,7 +85,7 @@
     b.style.border = '1px solid rgba(255,255,255,.2)';
     b.innerHTML = html + ' <button style="margin-left:auto;background:transparent;color:#fff;border:1px solid rgba(255,255,255,.5);border-radius:4px;padding:2px 8px;cursor:pointer" onclick="document.getElementById(\'gs-banner\').remove()">OK</button>';
   }
- 
+
   // ---------- UI ----------
   function buildUI() {
     var pane = document.getElementById('p0');
@@ -146,7 +146,7 @@
       b.style.opacity = lock ? 0.4 : '';
     });
   }
- 
+
   // ---------- Viewer guard: block number entry but keep suggestions ----------
   function installNumPopupGuard() {
     if (window._lfOrigOpenNumPopup) return;
@@ -160,7 +160,7 @@
       return window._lfOrigOpenNumPopup.apply(this, arguments);
     };
   }
- 
+
   // ---------- Host: hook addSpin to capture numbers ----------
   function installHostHook() {
     if (typeof window.addSpin !== 'function') return false;
@@ -178,7 +178,7 @@
     console.log('[group] host hook installed');
     return true;
   }
- 
+
   // ---------- Host: publish loop ----------
   function hostPublishTick() {
     if (state.role !== 'host' || !sb || !state.sessionId) return;
@@ -207,7 +207,7 @@
   function stopHostLoop() {
     if (state.hostTimer) { clearInterval(state.hostTimer); state.hostTimer = null; }
   }
- 
+
   // ---------- Viewer: polling fallback ----------
   function viewerPollTick() {
     if (state.role !== 'viewer' || !sb || !state.sessionId) return;
@@ -232,7 +232,7 @@
   function stopViewerLoop() {
     if (state.viewerTimer) { clearInterval(state.viewerTimer); state.viewerTimer = null; }
   }
- 
+
   // ---------- Start / Join / Fork / Leave ----------
   function startGroup() {
     ensureClient().then(function () {
@@ -277,7 +277,7 @@
       showBanner('Failed to start group: ' + (e.message || e), 'err');
     });
   }
- 
+
   function joinGroup() {
     var code = (prompt('Enter 6-digit group code:') || '').trim().toUpperCase();
     if (!code) return;
@@ -312,14 +312,14 @@
       showBanner('Failed to join: ' + (e.message || e), 'err');
     });
   }
- 
+
   function forkFromGroup() {
     if (state.role !== 'viewer') return;
     state.forked = true;
     updateUI();
     showBanner('Forked — you can now enter your own bets and play privately. You\'ll still see the host\'s spins update above.', 'ok');
   }
- 
+
   function applyRemoteSpin(num) {
     var fn = window._lfOrigAddSpin || window.addSpin;
     if (typeof fn !== 'function') return;
@@ -327,7 +327,7 @@
     try { fn(num); } catch (e) { console.warn('[group] applyRemoteSpin failed', e); }
     finally { state.applyingRemote = false; }
   }
- 
+
   function subscribeSpins() {
     if (!sb || !state.sessionId) return;
     try {
@@ -349,7 +349,7 @@
       console.warn('[group] subscribe failed', e);
     }
   }
- 
+
   function leaveGroup() {
     var p = Promise.resolve();
     if (state.role === 'host' && sb && state.sessionId) {
@@ -367,7 +367,7 @@
     state.forked = false;
     p.finally ? p.finally(updateUI) : p.then(updateUI, updateUI);
   }
- 
+
   function init() {
     buildUI();
     installNumPopupGuard();
