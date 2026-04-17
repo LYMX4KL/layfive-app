@@ -1383,7 +1383,13 @@ function undo(){if(spins.length){spins.pop();refreshAll()}}
 
 function newSess(){
   if(spins.length&&!confirm(t('confirm_new')))return;
-  spins=[];refreshAll();
+  // Clear element selector on new session
+  _mySelectedElement=null;
+  localStorage.removeItem('lf_my_element');
+  _restartViewOffset=0;
+  spins=[];
+  refreshAll();
+  _refreshMyElButtons();
 }
 
 // ===== REFERENCE MODAL (layout cards) =====
@@ -1832,7 +1838,9 @@ function refreshScorecard(){
 
 // ===== STRATEGY SIGNALS =====
 function computeSignals(){
-  const n=spins.length;
+  // Use post-restart spins — counts restart after restart
+  const activeSpins=spins.slice(_restartViewOffset);
+  const n=activeSpins.length;
   const signals={};
   if(n<5)return signals;
 
@@ -1842,7 +1850,7 @@ function computeSignals(){
   // Gather per-element data
   const elData={};
   ELS.forEach(el=>{
-    const recent=spins.slice(-WINDOW);
+    const recent=activeSpins.slice(-WINDOW);
     let hits=0,misses=0,maxBlankStreak=0,curBlank=0,hitStreak=0,curHit=0;
     let totalS=0,totalSp=0;
 
@@ -1857,16 +1865,16 @@ function computeSignals(){
       }
     });
 
-    // End streak (from all spins)
+    // End streak (from active spins only)
     let endHitStreak=0,endMissStreak=0;
-    for(let i=spins.length-1;i>=0;i--){
-      if(spins[i].hits[el]!=='-'){endHitStreak++;if(endMissStreak>0)break}
+    for(let i=activeSpins.length-1;i>=0;i--){
+      if(activeSpins[i].hits[el]!=='-'){endHitStreak++;if(endMissStreak>0)break}
       else{endMissStreak++;if(endHitStreak>0)break}
     }
 
-    // Overall session stats
+    // Overall session stats (post-restart)
     let sessS=0,sessSp=0;
-    spins.forEach(sp=>{if(sp.hits[el]==='s')sessS++;else if(sp.hits[el]==='sp')sessSp++});
+    activeSpins.forEach(sp=>{if(sp.hits[el]==='s')sessS++;else if(sp.hits[el]==='sp')sessSp++});
 
     elData[el]={hits,misses,maxBlankStreak,hitStreak,endHitStreak,endMissStreak,totalS,totalSp,sessS,sessSp,window:WINDOW};
   });
@@ -1936,9 +1944,9 @@ function computeSignals(){
   // Only fires after the 12-spin grace period. Overrides other signals for
   // the leading element (except cold — mark X if 4 blanks in last 15).
   if(n>LED_COUNT){
-    // Compute session-wide hit counts
+    // Compute session-wide hit counts (post-restart)
     const sessCounts={};
-    ELS.forEach(el=>{sessCounts[el]=spins.filter(x=>x.hits[el]==='s'||x.hits[el]==='sp').length});
+    ELS.forEach(el=>{sessCounts[el]=activeSpins.filter(x=>x.hits[el]==='s'||x.hits[el]==='sp').length});
     const sortedEls=[...ELS].sort((a,b)=>sessCounts[b]-sessCounts[a]);
     const topEl=sortedEls[0];
     const secondCount=sessCounts[sortedEls[1]]||0;
@@ -1946,7 +1954,7 @@ function computeSignals(){
 
     if(lead>=2){
       // Check if leader has 4-blank streak in last 15 (cold = X override)
-      const last15=spins.slice(-15);
+      const last15=activeSpins.slice(-15);
       let blankRun=0,maxBlank=0;
       last15.forEach(sp=>{
         if(sp.hits[topEl]==='-'){blankRun++;if(blankRun>maxBlank)maxBlank=blankRun}
@@ -2052,32 +2060,36 @@ function showSignalPopup(el){
 function refreshRulesStatus(){
   const bar=document.getElementById('rulesStatusBar');
   if(!bar)return;
-  const n=spins.length;
   const GRACE=12;
-  if(n<=GRACE){bar.style.display='none';return}
+
+  // Use post-restart spins for all rule calculations.
+  // On restart, saved data is for analysis only — counts restart.
+  const activeSpins=spins.slice(_restartViewOffset);
+  const an=activeSpins.length;
+  if(an<=GRACE){bar.style.display='none';return}
 
   const badges=[];
 
-  // Compute per-element stats for rules
-  const last15=spins.slice(-15);
-  const last20=spins.slice(-20);
+  // Compute windows from active (post-restart) spins only
+  const last15=activeSpins.slice(-15);
+  const last20=activeSpins.slice(-20);
 
-  // Session-wide counts
+  // Session-wide counts (post-restart only)
   const sessCounts={};
-  ELS.forEach(el=>{sessCounts[el]=spins.filter(x=>x.hits[el]==='s'||x.hits[el]==='sp').length});
+  ELS.forEach(el=>{sessCounts[el]=activeSpins.filter(x=>x.hits[el]==='s'||x.hits[el]==='sp').length});
   const sortedEls=[...ELS].sort((a,b)=>sessCounts[b]-sessCounts[a]);
   const sessLead=sessCounts[sortedEls[0]]-(sessCounts[sortedEls[1]]||0);
   const sessLeader=sessLead>=1?sortedEls[0]:null;
 
   // C1: 30 spins on top of 12 grace
-  const liveSpins=n-GRACE;
+  const liveSpins=an-GRACE;
   if(liveSpins>=30){
     badges.push('<span style="background:#c48a1a;color:#000;padding:1px 6px;border-radius:4px;font-weight:700">C1: '+liveSpins+' spins — end session</span>');
   }else if(liveSpins>=25){
     badges.push('<span style="color:#c48a1a">C1: '+liveSpins+'/30 spins</span>');
   }
 
-  // C2: leader change check (last-15 window, simplified for scorecard)
+  // C2: leader change check (last-15 window from active spins)
   if(last15.length>=15){
     const l15Counts={};
     ELS.forEach(el=>{l15Counts[el]=last15.filter(x=>x.hits[el]==='s'||x.hits[el]==='sp').length});
@@ -2089,12 +2101,11 @@ function refreshRulesStatus(){
     }
   }
 
-  // H1: check if any element the user might bet on has 4+ tail blank streak
-  // (Show for awareness — the full modal fires only in P&L mode)
+  // H1: check if any element has 4+ tail blank streak (active spins only)
   ELS.forEach(el=>{
     let streak=0;
-    for(let i=spins.length-1;i>=0;i--){
-      if(spins[i].hits[el]==='-')streak++;else break;
+    for(let i=activeSpins.length-1;i>=0;i--){
+      if(activeSpins[i].hits[el]==='-')streak++;else break;
     }
     if(streak>=4){
       const elName=lang==='zh'?L[el].cn:L[el].n;
@@ -2105,7 +2116,7 @@ function refreshRulesStatus(){
   // H2: last 20 spins never net positive (show only as info since no P&L here)
   // Skip in scorecard-only mode — needs P&L data
 
-  // H4: 4 of 5 elements cold (4-blank streak) in last 15
+  // H4: 4 of 5 elements cold (4-blank streak) in last 15 (active spins)
   if(last15.length>=15){
     const coldEls=ELS.filter(el=>{
       let run=0,max=0;
@@ -2121,7 +2132,7 @@ function refreshRulesStatus(){
     }
   }
 
-  // Suggestion: session leader
+  // Suggestion: session leader (post-restart)
   if(sessLeader && sessLead>=2){
     const elName=lang==='zh'?L[sessLeader].cn:L[sessLeader].n;
     badges.push('<span style="color:#00e676">★ '+elName+' leads by '+sessLead+'</span>');
@@ -2140,13 +2151,15 @@ function refreshBehindBanner(){
   const banner=document.getElementById('behindBanner');
   if(spins.length<5){banner.style.display='none';return}
 
-  const n=spins.length;
+  // Use last 20 spins for lead-loss calculation (includes pre-restart data)
+  const recent=spins.slice(-20);
+  const n=recent.length;
   const expSt=12/37, expSp=6/37;
   let worstEl=null,worstGap=-999;
 
   ELS.forEach(el=>{
-    const sHits=spins.filter(x=>x.hits[el]==='s').length;
-    const spHits=spins.filter(x=>x.hits[el]==='sp').length;
+    const sHits=recent.filter(x=>x.hits[el]==='s').length;
+    const spHits=recent.filter(x=>x.hits[el]==='sp').length;
     const stGap=expSt-(sHits/n);
     const spGap=expSp-(spHits/n);
     const totalGap=stGap+spGap; // positive = behind
@@ -2155,8 +2168,8 @@ function refreshBehindBanner(){
 
   if(!worstEl||worstGap<=0){banner.style.display='none';return}
 
-  const sHits=spins.filter(x=>x.hits[worstEl]==='s').length;
-  const spHits=spins.filter(x=>x.hits[worstEl]==='sp').length;
+  const sHits=recent.filter(x=>x.hits[worstEl]==='s').length;
+  const spHits=recent.filter(x=>x.hits[worstEl]==='sp').length;
   const stPct=(sHits/n*100).toFixed(1);
   const spPct=(spHits/n*100).toFixed(1);
   const totalPct=((sHits+spHits)/n*100).toFixed(1);
