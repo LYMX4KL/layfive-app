@@ -26,6 +26,7 @@
   var _user = null;
   var _tier = 'free';  // free, pro, premium
   var _authReady = false;
+  var _disclaimerAccepted = false;
 
   // Feature → minimum tier mapping
   var TIER_LEVELS = { free: 0, pro: 1, premium: 2 };
@@ -85,7 +86,124 @@
       _tier = 'free';
     }
     _authReady = true;
+    // Check disclaimer for paid users
+    if (_user && _tier !== 'free') {
+      await checkDisclaimer();
+    } else {
+      _disclaimerAccepted = true; // Free users don't need disclaimer
+    }
     updateUI();
+  }
+
+  // ---------- Disclaimer check ----------
+  async function checkDisclaimer() {
+    if (!_supabase || !_user) { _disclaimerAccepted = true; return; }
+    try {
+      var context = _tier === 'premium' ? 'upgrade_premium' : 'upgrade_pro';
+      var result = await _supabase
+        .from('disclaimer_acceptances')
+        .select('id')
+        .eq('user_id', _user.id)
+        .in('context', ['signup', context])
+        .limit(1);
+      if (result.data && result.data.length > 0) {
+        _disclaimerAccepted = true;
+      } else {
+        _disclaimerAccepted = false;
+        showDisclaimerModal();
+      }
+    } catch (e) {
+      console.warn('[auth] Disclaimer check failed:', e);
+      _disclaimerAccepted = true; // Don't block on error
+    }
+  }
+
+  // ---------- In-app disclaimer modal ----------
+  function showDisclaimerModal() {
+    var existing = document.getElementById('lf-disclaimer-overlay');
+    if (existing) existing.remove();
+
+    var overlay = document.createElement('div');
+    overlay.id = 'lf-disclaimer-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:10001;display:flex;align-items:center;justify-content:center;padding:12px;overflow-y:auto';
+
+    var tierLabel = _tier === 'premium' ? 'Premium' : 'Pro';
+    var tierColor = _tier === 'premium' ? '#a78bfa' : '#d4af37';
+
+    var box = document.createElement('div');
+    box.style.cssText = 'background:#1a1f2e;border:2px solid ' + tierColor + ';border-radius:12px;padding:20px;width:100%;max-width:380px;color:#eee;max-height:90vh;overflow-y:auto';
+    box.innerHTML =
+      '<h3 style="color:' + tierColor + ';margin:0 0 12px;text-align:center">Important Disclaimer</h3>' +
+      '<p style="font-size:.8em;color:#aaa;margin:0 0 12px;text-align:center">Please read and accept to use ' + tierLabel + ' features.</p>' +
+
+      '<div style="font-size:.8em;color:#ccc;line-height:1.5">' +
+        '<p style="margin:0 0 8px"><b style="color:#eee">1. Not a winning strategy</b><br>' +
+        'LayFive is a tracking tool. It does not change the house edge, predict outcomes, or guarantee wins. Every spin is independent. Past results do not predict future outcomes.</p>' +
+
+        '<p style="margin:0 0 8px"><b style="color:#eee">2. Entertainment only</b><br>' +
+        'LayFive is for entertainment and educational purposes. It is not financial or gambling advice.</p>' +
+
+        '<p style="margin:0 0 8px"><b style="color:#eee">3. Responsible gambling</b><br>' +
+        'Play within your means. Never gamble with money you cannot afford to lose. If gambling affects your life, call 1-800-GAMBLER.</p>' +
+
+        '<p style="margin:0 0 8px"><b style="color:#eee">4. Non-refundable</b><br>' +
+        'Paid subscriptions are non-refundable. You may cancel anytime but no refunds for the current billing period.</p>' +
+
+        '<p style="margin:0 0 8px"><b style="color:#eee">5. Age requirement</b><br>' +
+        'You must be at least 21 years old (or the legal gambling age in your jurisdiction) to use LayFive.</p>' +
+
+        '<p style="margin:0 0 8px"><b style="color:#eee">6. Jurisdiction</b><br>' +
+        'You are responsible for determining whether gambling tracking tools are permitted in your jurisdiction.</p>' +
+
+        '<p style="margin:0;font-size:.85em;color:#666;text-align:center">&copy; 2026 LayFive. All rights reserved.</p>' +
+      '</div>' +
+
+      '<label id="lf-disc-label" style="display:flex;align-items:flex-start;gap:8px;margin:14px 0;cursor:pointer">' +
+        '<input type="checkbox" id="lf-disc-check" style="margin-top:3px;accent-color:' + tierColor + '" />' +
+        '<span style="font-size:.8em;color:#ddd">I have read and agree to the above disclaimer. I understand that LayFive is not a winning system and that gambling involves risk. I confirm I am at least 21 years old.</span>' +
+      '</label>' +
+
+      '<button id="lf-disc-accept" disabled style="width:100%;padding:10px;background:#555;color:#999;border:none;border-radius:6px;font-weight:700;cursor:not-allowed;font-size:.9em">Accept &amp; Continue</button>';
+
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    var checkbox = document.getElementById('lf-disc-check');
+    var acceptBtn = document.getElementById('lf-disc-accept');
+
+    checkbox.onchange = function () {
+      if (checkbox.checked) {
+        acceptBtn.disabled = false;
+        acceptBtn.style.background = tierColor;
+        acceptBtn.style.color = '#000';
+        acceptBtn.style.cursor = 'pointer';
+      } else {
+        acceptBtn.disabled = true;
+        acceptBtn.style.background = '#555';
+        acceptBtn.style.color = '#999';
+        acceptBtn.style.cursor = 'not-allowed';
+      }
+    };
+
+    acceptBtn.onclick = async function () {
+      acceptBtn.disabled = true;
+      acceptBtn.textContent = 'Saving...';
+      try {
+        var context = _tier === 'premium' ? 'upgrade_premium' : 'upgrade_pro';
+        await _supabase.from('disclaimer_acceptances').insert({
+          user_id: _user.id,
+          version: 'v1.0',
+          context: context,
+        });
+      } catch (e) {
+        console.warn('[auth] Disclaimer save failed:', e);
+      }
+      _disclaimerAccepted = true;
+      overlay.remove();
+      updateUI();
+    };
+
+    // Don't allow dismissing without accepting — no click-outside-to-close
   }
 
   // ---------- Direct login modal ----------
@@ -178,6 +296,12 @@
         }
 
         overlay.remove();
+        // Check disclaimer for paid users after login
+        if (_tier !== 'free') {
+          await checkDisclaimer();
+        } else {
+          _disclaimerAccepted = true;
+        }
         updateUI();
       } catch (e) {
         errorDiv.textContent = 'Connection error. Please try again.';
@@ -211,6 +335,7 @@
   function canAccess(feature) {
     var required = FEATURE_TIERS[feature];
     if (!required) return true; // Unknown feature = allow
+    if (!_disclaimerAccepted && TIER_LEVELS[_tier] > 0) return false; // Block until disclaimer accepted
     return TIER_LEVELS[_tier] >= TIER_LEVELS[required];
   }
 
@@ -298,6 +423,7 @@
     getTier: function () { return _tier; },
     getUser: function () { return _user; },
     isReady: function () { return _authReady; },
+    isDisclaimerAccepted: function () { return _disclaimerAccepted; },
     canAccess: canAccess,
     gateFeature: gateFeature,
     showUpgradePrompt: showUpgradePrompt,
