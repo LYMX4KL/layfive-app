@@ -902,17 +902,17 @@
     var pane = document.getElementById('p0');
     if (!pane) return false;
     if (document.getElementById('lfocr-btn')) return true;
-    var actions = pane.querySelector('.actions');
+    // Commit A: prefer new Row 1 container, fall back to legacy .actions.
+    var actions = pane.querySelector('.actions.actions-row1') || pane.querySelector('.actions');
     if (!actions) return false;
     // Ensure the row wraps so new buttons never overflow off-screen on phones.
     actions.style.flexWrap = 'wrap';
     var btn = document.createElement('button');
     btn.id = 'lfocr-btn';
     btn.type = 'button';
+    btn.className = 'btn-photo';
     btn.title = 'Import numbers from a scoreboard photo';
     btn.textContent = '📷 Photo';
-    // Bright, highly visible so it's hard to miss. Also prepended so it shows first.
-    btn.style.cssText = 'background:linear-gradient(135deg,#f5a623,#d48506);color:#000;border:1px solid #ffc567;border-radius:6px;padding:6px 10px;font-weight:700;font-size:.9em;cursor:pointer';
     btn.onclick = function () {
       if (window._lfAuth && !window._lfAuth.gateFeature('ocr')) return;
       var fi = document.getElementById('lfocr-file');

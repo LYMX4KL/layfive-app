@@ -57,25 +57,37 @@ button{font-family:inherit}
 .auth-error{color:#e74c3c;font-size:.85em;margin-top:8px;min-height:20px}
 
 /* === TOP BAR === */
-.top{background:#111;padding:8px 10px;display:flex;align-items:center;gap:6px;position:sticky;top:0;z-index:100;border-bottom:1px solid #333;flex-wrap:wrap}
-.top .logo{height:28px;vertical-align:middle}
-.top input[type="date"]{padding:4px 6px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:.85em;width:auto}
-.top input[type="text"]{padding:4px 6px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:.85em;width:70px}
-.top select{padding:4px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:.85em}
+.top{background:#111;padding:4px 8px;display:flex;align-items:center;gap:5px;position:sticky;top:0;z-index:100;border-bottom:1px solid #333;flex-wrap:wrap;min-height:0}
+.top .logo{height:24px;vertical-align:middle}
+.top input[type="date"]{padding:3px 5px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:.8em;width:auto}
+.top input[type="text"]{padding:3px 5px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:.8em;width:64px}
+.top select{padding:3px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:.8em}
 .top .spacer{flex:1}
-.lang-btn{background:none;border:1px solid var(--gold);color:var(--gold);border-radius:4px;padding:3px 8px;font-size:.8em;cursor:pointer;font-weight:700}
-.profile-btn{background:none;border:none;color:var(--dim);font-size:1.2em;cursor:pointer;padding:3px 6px}
+.lang-btn{background:none;border:1px solid var(--gold);color:var(--gold);border-radius:4px;padding:3px 7px;font-size:.78em;cursor:pointer;font-weight:700}
+.profile-btn{background:none;border:none;color:var(--dim);font-size:1.15em;cursor:pointer;padding:2px 5px}
 
 /* === TABS === */
-.tabs{display:flex;flex-wrap:wrap;background:#111;border-bottom:2px solid var(--gold);position:sticky;top:45px;z-index:99}
-.tab{flex:0 0 25%;padding:10px 4px;text-align:center;font-size:.85em;font-weight:600;color:var(--dim);background:transparent;border:none;cursor:pointer;box-sizing:border-box}
+.tabs{display:flex;flex-wrap:wrap;background:#111;border-bottom:2px solid var(--gold);position:sticky;top:38px;z-index:99;margin:0}
+.tab{flex:0 0 25%;padding:8px 4px;text-align:center;font-size:.82em;font-weight:600;color:var(--dim);background:transparent;border:none;cursor:pointer;box-sizing:border-box}
 .tab.on{color:var(--gold);border-bottom:2px solid var(--gold);margin-bottom:-2px}
 .pane{display:none}.pane.on{display:block}
 
-/* === ACTIONS BAR === */
-.actions{display:flex;gap:4px;padding:4px 6px;background:#0a0a1a}
-.actions button{flex:1;padding:8px;border:none;border-radius:6px;font-weight:600;font-size:.85em;cursor:pointer}
+/* === ACTIONS BAR (2 rows — Commit A) === */
+.actions-wrap{background:#0a0a1a;margin:0;border-bottom:1px solid #222}
+.actions{display:flex;gap:4px;padding:3px 6px;background:#0a0a1a;flex-wrap:wrap;align-items:center}
+.actions.actions-row1{padding-top:4px;padding-bottom:2px}
+.actions.actions-row2{padding-top:2px;padding-bottom:4px}
+.actions button{flex:1 1 0;min-width:0;height:32px;padding:0 6px;border:none;border-radius:6px;font-weight:700;font-size:.82em;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;line-height:1;box-sizing:border-box}
+.actions #gs-status{font-size:.78em;color:#ccc;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 4px}
 .btn-undo{background:#c44;color:#fff}.btn-new{background:#555;color:#fff}.btn-save{background:var(--gold);color:#000}
+.btn-restart{background:linear-gradient(135deg,#ff8c00,#cc4400);color:#fff;border:1px solid #ffae42!important}
+.btn-ref{background:linear-gradient(135deg,#1e3a8a,#0b1e4a);color:#fff;border:1px solid #4a6bd4!important}
+.btn-photo{background:linear-gradient(135deg,#f5a623,#d48506);color:#000;border:1px solid #ffc567!important}
+.btn-pnl{background:#8a6010;color:#fff;border:1px solid #d4af37!important}
+.btn-gs-start{background:#0b5c2a;color:#fff;border:1px solid #3a9a55!important}
+.btn-gs-join{background:#1e3a8a;color:#fff;border:1px solid #4a6bd4!important}
+.btn-gs-leave{background:#6b0f0f;color:#fff;border:1px solid #c94a4a!important}
+.btn-gs-fork{background:#5a3a8a;color:#fff;border:1px solid #8a6acc!important}
 .spin-count{text-align:center;padding:4px;font-size:.85em;color:var(--gold);font-weight:700;background:#0a0a1a}
 
 /* === NUMBER PICKER POPUP === */
@@ -506,12 +518,18 @@ button{font-family:inherit}
 
 <!-- ==================== SCORECARD TAB ==================== -->
 <div class="pane on" id="p0">
-  <div class="actions">
-    <button class="btn-undo" onclick="undo()" data-i18n="btn_undo">↩ Undo</button>
-    <button class="btn-new" onclick="newSess()" data-i18n="btn_new">New</button>
-    <button class="btn-save" onclick="saveSess()" data-i18n="btn_save">Save Session</button>
-    <button class="btn-restart" onclick="if(window._lfAuth&&!window._lfAuth.gateFeature('restart'))return;restartSess()" data-i18n="btn_restart" style="background:linear-gradient(135deg,#ff8c00,#cc4400);color:#fff;border:1px solid #ffae42;border-radius:6px;padding:6px 10px;font-weight:700;cursor:pointer">⟳ Restart</button>
-    <button class="btn-ref" onclick="openReference()" data-i18n="btn_reference" style="background:linear-gradient(135deg,#1e3a8a,#0b1e4a);color:#fff;border:1px solid #4a6bd4;border-radius:6px;padding:6px 10px;font-weight:700;cursor:pointer">📖 Reference</button>
+  <div class="actions-wrap" id="actionsWrap">
+    <div class="actions actions-row1">
+      <!-- 📷 Photo is prepended here by layfive-ocr.js -->
+      <button class="btn-undo" onclick="undo()" data-i18n="btn_undo">↩ Undo</button>
+      <button class="btn-new" onclick="newSess()" data-i18n="btn_new">New</button>
+      <button class="btn-save" onclick="saveSess()" data-i18n="btn_save">Save Session</button>
+      <button class="btn-restart" onclick="if(window._lfAuth&&!window._lfAuth.gateFeature('restart'))return;restartSess()" data-i18n="btn_restart">⟳ Restart</button>
+    </div>
+    <div class="actions actions-row2" id="actionsRow2">
+      <button class="btn-ref" onclick="openReference()" data-i18n="btn_reference">📖 Reference</button>
+      <!-- 💰 P&L injected by layfive-pnl.js, 👥 Start Group / 🔗 Join Group / Leave / Fork / status injected by layfive-group.js -->
+    </div>
   </div>
 
   <!-- Reference modal — holds layout cards + quick help -->
@@ -533,7 +551,7 @@ button{font-family:inherit}
       <span style="color:#444">|</span>
       <span id="rtBehind" style="color:#f87171" title="Most behind element in last 18 spins">—</span>
       <span style="color:#444">|</span>
-      <span id="rtIdle" style="color:#888;display:none"></span>
+      <span id="rtIdle" style="color:#888;display:none" title="Idle — waiting for new leader">⏸ Idle</span>
     </div>
   </div>
   <div id="restartWarn" style="display:none;margin:6px 0;padding:8px 10px;background:rgba(255,140,0,.18);border:1px solid #ff8c00;border-radius:6px;color:#ffb347;font-size:.85em;text-align:center" data-i18n="restart_warn">⚠ Approaching 60 spins — consider Restart to refresh the pattern.</div>
@@ -2092,12 +2110,12 @@ function refreshRulesStatus(){
   const sessLeader=sessLead>=1?sortedEls[0]:null;
 
   // C1: 30 spins on top of 12 grace — uses ALL session spins (not post-restart)
-    const c1Total=spins.length;
-    const liveSpins=c1Total-GRACE;
-  if(liveSpins>=30){
-    badges.push('<span style="background:#c48a1a;color:#000;padding:1px 6px;border-radius:4px;font-weight:700">C1: '+liveSpins+' spins — end session</span>');
-  }else if(liveSpins>=25){
-    badges.push('<span style="color:#c48a1a">C1: '+liveSpins+'/30 spins</span>');
+  const c1Total=spins.length;
+  const c1Live=c1Total-GRACE;
+  if(c1Live>=30){
+    badges.push('<span style="background:#c48a1a;color:#000;padding:1px 6px;border-radius:4px;font-weight:700">C1: '+c1Live+' spins — end session</span>');
+  }else if(c1Live>=25){
+    badges.push('<span style="color:#c48a1a">C1: '+c1Live+'/30 spins</span>');
   }
 
   // C2: leader change check (last-15 window from active spins)

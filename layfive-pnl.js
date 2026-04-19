@@ -201,23 +201,29 @@
   }
 
   // ---------- Sticky top wrapper ----------
-  // Groups .actions (incl. Undo), #gs-bar, and #pnl-stats into a single
-  // sticky container so the whole control strip stays visible while the
+  // Commit A: wrapper now holds the whole .actions-wrap (both Row 1 and Row 2)
+  // plus #pnl-stats, so the entire control strip stays visible while the
   // scorecard scrolls.
   function installStickyTop() {
     var pane = document.getElementById('p0');
     if (!pane) return null;
     var wrap = document.getElementById('pnl-sticky-top');
     if (wrap) { updateStickyTopOffset(); return wrap; }
-    var actions = pane.querySelector('.actions');
-    if (!actions) return null;
+    var actionsWrap = document.getElementById('actionsWrap') || pane.querySelector('.actions-wrap');
+    var anchor = actionsWrap || pane.querySelector('.actions');
+    if (!anchor) return null;
     wrap = document.createElement('div');
     wrap.id = 'pnl-sticky-top';
-    wrap.style.cssText = 'position:sticky;z-index:60;background:#0f1320;padding:4px 0;margin:0 -4px 4px;box-shadow:0 2px 6px rgba(0,0,0,.4)';
-    actions.parentNode.insertBefore(wrap, actions);
-    wrap.appendChild(actions);
-    var gsBar = document.getElementById('gs-bar');
-    if (gsBar) wrap.appendChild(gsBar);
+    wrap.style.cssText = 'position:sticky;z-index:60;background:#0a0a1a;padding:0;margin:0;box-shadow:0 2px 6px rgba(0,0,0,.4)';
+    anchor.parentNode.insertBefore(wrap, anchor);
+    if (actionsWrap) {
+      wrap.appendChild(actionsWrap);
+    } else {
+      // Legacy fallback — move the single .actions row and any #gs-bar
+      wrap.appendChild(anchor);
+      var gsBar = document.getElementById('gs-bar');
+      if (gsBar) wrap.appendChild(gsBar);
+    }
     updateStickyTopOffset();
     window.addEventListener('resize', updateStickyTopOffset);
     return wrap;
@@ -258,7 +264,7 @@
     if (!panel) return;
     var rem = remaining();
     var pct = pnl.startBankroll ? (pnl.netPL / pnl.startBankroll * 100) : 0;
-    var plColor = pnl.netPL >= 0 ? '#22ff22' : '#ff3333';
+    var plColor = pnl.netPL >= 0 ? '#22ff22' : '#ff3332';
     var paused = (pnl.unitCount === 0);
     var betLabel = paused
       ? '<b style="color:#ff9a3c">PAUSED (0 units)</b>'
@@ -439,22 +445,28 @@
   function buildButton() {
     var pane = document.getElementById('p0');
     if (!pane) return;
-    var bar = document.getElementById('gs-bar');
-    if (!bar) {
-      // fall back to actions row if group bar isn't there yet
-      bar = pane.querySelector('.actions');
-      if (!bar) return;
-    }
+    // Commit A: prefer the new Row 2 container; fall back to legacy gs-bar or .actions.
+    var bar = document.getElementById('actionsRow2') ||
+              document.getElementById('gs-bar') ||
+              pane.querySelector('.actions');
+    if (!bar) return;
     if (document.getElementById('pnl-btn')) return;
     var btn = document.createElement('button');
     btn.id = 'pnl-btn';
-    btn.style.cssText = 'background:#8a6010;color:#fff;border:1px solid #d4af37;border-radius:6px;padding:5px 10px;font-weight:700;cursor:pointer';
+    btn.className = 'btn-pnl';
     btn.textContent = '💰 P&L';
     btn.onclick = function () {
       if (window._lfAuth && !window._lfAuth.gateFeature('pnl')) return;
       openSetupModal(false);
     };
-    bar.appendChild(btn);
+    // Insert P&L right after the Reference button (position 2 in Row 2),
+    // before the group buttons. Fall back to append if Reference not found.
+    var refBtn = bar.querySelector('.btn-ref');
+    if (refBtn && refBtn.parentNode === bar) {
+      bar.insertBefore(btn, refBtn.nextSibling);
+    } else {
+      bar.appendChild(btn);
+    }
   }
 
   // ========== LEAD-LOSS WARNING (Premium / Live P&L) ==========
