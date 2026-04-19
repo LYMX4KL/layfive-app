@@ -56,15 +56,17 @@ button{font-family:inherit}
 .auth-form .btn-link{background:none;border:none;color:var(--gold);font-size:.85em;cursor:pointer;padding:5px;margin-top:8px}
 .auth-error{color:#e74c3c;font-size:.85em;margin-top:8px;min-height:20px}
 
-/* === TOP BAR === */
-.top{background:#111;padding:4px 8px;display:flex;align-items:center;gap:5px;position:sticky;top:0;z-index:100;border-bottom:1px solid #333;flex-wrap:wrap;min-height:0}
-.top .logo{height:24px;vertical-align:middle}
-.top input[type="date"]{padding:3px 5px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:.8em;width:auto}
-.top input[type="text"]{padding:3px 5px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:.8em;width:64px}
-.top select{padding:3px;border-radius:4px;border:1px solid #444;background:#222;color:#fff;font-size:.8em}
-.top .spacer{flex:1}
-.lang-btn{background:none;border:1px solid var(--gold);color:var(--gold);border-radius:4px;padding:3px 7px;font-size:.78em;cursor:pointer;font-weight:700}
-.profile-btn{background:none;border:none;color:var(--dim);font-size:1.15em;cursor:pointer;padding:2px 5px}
+/* === TOP BAR (Commit E: single row, nowrap; shrink everything so PREMIUM badge fits without wrap) === */
+.top{background:#111;padding:3px 6px;display:flex;align-items:center;gap:3px;position:sticky;top:0;z-index:100;border-bottom:1px solid #333;flex-wrap:nowrap;min-height:0;overflow:hidden}
+.top .logo{height:22px;vertical-align:middle;flex:0 0 auto}
+.top input[type="date"]{padding:2px 3px;border-radius:3px;border:1px solid #444;background:#222;color:#fff;font-size:.72em;flex:0 1 auto;min-width:0;width:92px;max-width:100px}
+.top input[type="text"]{padding:2px 4px;border-radius:3px;border:1px solid #444;background:#222;color:#fff;font-size:.75em;flex:1 1 50px;min-width:40px;width:auto}
+.top .spacer{flex:0 0 4px;min-width:4px}
+.lang-btn{background:none;border:1px solid var(--gold);color:var(--gold);border-radius:3px;padding:2px 5px;font-size:.74em;cursor:pointer;font-weight:700;flex:0 0 auto;white-space:nowrap;line-height:1.2}
+.profile-btn{background:none;border:none;color:var(--dim);font-size:1em;cursor:pointer;padding:0 3px;flex:0 0 auto;line-height:1}
+/* Auth badge: shrink the PREMIUM/PRO/FREE pill so it fits inline with everything else. */
+#lf-auth-badge{flex:0 0 auto;white-space:nowrap;margin-left:2px!important}
+#lf-auth-badge span{font-size:.62em!important;padding:2px 4px!important;letter-spacing:.3px!important}
 
 /* === TABS === */
 .tabs{display:flex;flex-wrap:wrap;background:#111;border-bottom:2px solid var(--gold);position:sticky;top:38px;z-index:99;margin:0}
@@ -116,11 +118,20 @@ button{font-family:inherit}
 .sig-popup p{color:var(--txt);font-size:.85em;line-height:1.5;margin:4px 0}
 .sig-popup .close-btn{display:block;width:100%;padding:10px;background:var(--gold);color:#000;font-weight:700;border:none;border-radius:8px;cursor:pointer;margin-top:12px}
 
+/* === MY ELEMENT ROW — sticky (Commit E) === */
+.my-el-row{position:sticky;z-index:75;background:#111820;border:1px solid #333;border-radius:0;margin:0!important;padding:6px 8px!important}
+
 /* === SCORECARD TABLE === */
-.sc-wrap{overflow-x:auto;overflow-y:auto;padding:4px}
-.sc{border-collapse:collapse;width:100%;table-layout:fixed}
-.sc th{padding:4px 2px;font-size:.85em;font-weight:700;text-align:center;border:1px solid #ccc;background:#f0f0f0;color:#333}
-.sc td{padding:2px;text-align:center;border:1px solid #ddd;height:30px;font-size:1em;color:#222;background:#fff}
+/* Commit E: switched to border-collapse:separate so <thead> position:sticky works on iOS Safari + Chrome */
+.sc-wrap{overflow:visible;padding:4px}
+.sc{border-collapse:separate;border-spacing:0;width:100%;table-layout:fixed}
+.sc thead{position:sticky;z-index:60;background:#f0f0f0}
+.sc thead tr th{background:#f0f0f0}
+.sc th{padding:4px 2px;font-size:.85em;font-weight:700;text-align:center;border-right:1px solid #ccc;border-bottom:1px solid #ccc;background:#f0f0f0;color:#333}
+.sc thead tr:first-child th{border-top:1px solid #ccc}
+.sc th:first-child{border-left:1px solid #ccc}
+.sc td{padding:2px;text-align:center;border-right:1px solid #ddd;border-bottom:1px solid #ddd;height:30px;font-size:1em;color:#222;background:#fff}
+.sc td:first-child{border-left:1px solid #ddd}
 .sc .rn{width:24px;background:#f5f5f5;color:#aaa;font-size:.75em}
 .sc .sn{width:32px;background:#ffe;font-weight:700;font-size:1em}
 .sc .el{width:32px;font-size:.9em;line-height:1}
@@ -499,13 +510,13 @@ button{font-family:inherit}
 <!-- ==================== MAIN APP ==================== -->
 <div class="screen" id="screenApp">
 
-<!-- TOP BAR -->
+<!-- TOP BAR (Commit E revised: single row with date/casino + all badges — shrunk to fit phone width without wrap) -->
 <div class="top">
   <img class="logo" src="icon.png" alt="LayFive">
-  <input type="date" id="iDate">
+  <input type="date" id="iDate" title="Session date">
   <input type="text" id="iCasino" placeholder="Casino" data-i18n-ph="casino_ph">
   <span class="spacer"></span>
-  <button class="lang-btn" onclick="window.open('https://www.layfive.com/','_blank')" title="Back to website" style="background:var(--gold);color:#000;padding:4px 8px;border-radius:4px;border:none;font-weight:700;font-size:.8em;cursor:pointer">🏠 Web</button>
+  <button class="lang-btn" onclick="window.open('https://www.layfive.com/','_blank')" title="Back to website" style="background:var(--gold);color:#000;padding:2px 5px;border-radius:3px;border:none;font-weight:700;font-size:.74em;cursor:pointer;line-height:1.2">🏠</button>
   <button class="lang-btn" onclick="toggleLang()" id="langBtn">中</button>
   <button class="profile-btn" onclick="showTab(3)" title="Profile">👤</button>
 </div>
@@ -561,8 +572,8 @@ button{font-family:inherit}
     </div>
   </div>
   <div id="restartWarn" style="display:none;margin:6px 0;padding:8px 10px;background:rgba(255,140,0,.18);border:1px solid #ff8c00;border-radius:6px;color:#ffb347;font-size:.85em;text-align:center" data-i18n="restart_warn">⚠ Approaching 60 spins — consider Restart to refresh the pattern.</div>
-  <!-- My Element selector (for lead-loss tracking without P&L) -->
-  <div id="myElPicker" style="margin:6px 0;padding:6px 8px;background:#111820;border:1px solid #333;border-radius:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+  <!-- My Element selector (for lead-loss tracking without P&L) — Commit E: sticky, pinned below status line -->
+  <div id="myElPicker" class="my-el-row" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
     <span style="font-size:.8em;color:#aaa;white-space:nowrap">🎯 My Element:</span>
     <button class="my-el-btn" data-el="M"  onclick="pickMyElement('M')"  style="flex:1;min-width:50px;padding:4px 2px;border-radius:5px;border:1px solid #555;background:#1a1a2e;color:var(--m);font-size:.78em;font-weight:700;cursor:pointer">● Metal</button>
     <button class="my-el-btn" data-el="W"  onclick="pickMyElement('W')"  style="flex:1;min-width:50px;padding:4px 2px;border-radius:5px;border:1px solid #555;background:#1a1a2e;color:var(--w);font-size:.78em;font-weight:700;cursor:pointer">▮ Wood</button>
@@ -1440,20 +1451,77 @@ function addSpin(num){
   ELS.forEach(el=>hits[el]=hitType(num,el));
   spins.push({num,hits,isLED:spins.length<LED_COUNT});
   refreshAll();
+  _lfMirrorLive(); // Commit F: crash-recovery autosave
   // Scroll to newly added row
   const cell=document.getElementById('s'+spins.length);
   if(cell)cell.scrollIntoView({block:'nearest'});
 }
 
-function undo(){if(spins.length){spins.pop();refreshAll()}}
+function undo(){if(spins.length){spins.pop();refreshAll();_lfMirrorLive()}}
 
-function newSess(){
+// ===== AUTOSAVE (Commit F) =====
+// Kenny's testing data was being lost because saveSessSilent was defined but never called.
+// Two layers of protection now:
+//   1. Mirror spins[] to localStorage on every add/undo — survives crashes/tab close.
+//   2. Call saveSessSilent() on Restart and New Session boundaries — pushes to Firestore.
+// On page load, offer recovery if the live mirror has more spins than the last saved session.
+function _lfMirrorLive(){
+  try{
+    if(!spins||!spins.length){localStorage.removeItem('lf_live_spins');return;}
+    const payload={
+      spins:spins,
+      date:(document.getElementById('iDate')||{}).value||'',
+      casino:(document.getElementById('iCasino')||{}).value||'',
+      ts:Date.now()
+    };
+    localStorage.setItem('lf_live_spins',JSON.stringify(payload));
+  }catch(e){/* quota/private-mode */}
+}
+function _lfClearLiveMirror(){try{localStorage.removeItem('lf_live_spins')}catch(e){}}
+function _lfReadLiveMirror(){
+  try{const s=localStorage.getItem('lf_live_spins');return s?JSON.parse(s):null}catch(e){return null}
+}
+// Offer to restore unsaved spins on page load (called once after firebase auth settles)
+function _lfOfferRecovery(){
+  const m=_lfReadLiveMirror();
+  if(!m||!m.spins||!m.spins.length)return;
+  // Skip if the in-memory spins already match (same session continuing)
+  if(spins.length>=m.spins.length)return;
+  // Skip if mirror is older than 48h — likely stale/already-saved session
+  if(m.ts && (Date.now()-m.ts)>48*3600*1000){_lfClearLiveMirror();return;}
+  const prompt=(window._lang==='zh')
+    ? '发现未保存的 '+m.spins.length+' 次转动（上次修改 '+new Date(m.ts).toLocaleString()+'）。\n\n是否恢复到当前场次？\n\n[确定] 恢复\n[取消] 放弃（数据将丢失）'
+    : 'Found '+m.spins.length+' unsaved spins (last edited '+new Date(m.ts).toLocaleString()+').\n\nRestore to current session?\n\n[OK] Restore\n[Cancel] Discard (data will be lost)';
+  if(confirm(prompt)){
+    spins=m.spins.slice();
+    if(m.date){const d=document.getElementById('iDate');if(d)d.value=m.date}
+    if(m.casino){const c=document.getElementById('iCasino');if(c)c.value=m.casino}
+    _restartViewOffset=0;
+    refreshAll();
+  }else{
+    _lfClearLiveMirror();
+  }
+}
+// Run recovery after firebase auth settles (or after 2s if offline). Single-shot.
+window.addEventListener('load',function(){
+  let ran=false;
+  const go=function(){if(ran)return;ran=true;try{_lfOfferRecovery()}catch(e){console.warn('Recovery error',e)}};
+  setTimeout(go,2500); // fallback trigger regardless of auth state
+});
+
+async function newSess(){
   if(spins.length&&!confirm(t('confirm_new')))return;
+  // Commit F: autosave the current session before wiping (protects against accidental discards).
+  // Only cloud-save if logged in and session has enough data to be meaningful (≥5 spins).
+  if(spins.length>=5 && firebaseReady && currentUser){
+    try{await saveSessSilent('newsess')}catch(e){console.warn('Autosave on newSess failed',e)}
+  }
   // Clear element selector on new session
   _mySelectedElement=null;
   localStorage.removeItem('lf_my_element');
   _restartViewOffset=0;
   spins=[];
+  _lfClearLiveMirror();
   _resetRollingTracker();
   refreshAll();
   _refreshMyElButtons();
@@ -1560,6 +1628,13 @@ async function restartSess(){
   if(spins.length<12){alert(t('restart_need12'));return}
   if(!confirm(t('restart_confirm')))return;
 
+  // Commit F: autosave to Firestore before restarting so pooled analysis captures every restart cycle.
+  // Restart still keeps spins[] in memory (it's only a view reset), so this doesn't disrupt the session;
+  // it just guarantees the cloud has a checkpoint copy.
+  if(firebaseReady && currentUser){
+    try{await saveSessSilent('restart')}catch(e){console.warn('Autosave on restart failed',e)}
+  }
+
   // Restart NO LONGER archives separately — spins stay in the same session.
   // The scorecard resets its "view" but all spins remain in memory.
   // Only "New Session" (saveSess + clear) truly starts fresh.
@@ -1573,6 +1648,7 @@ async function restartSess(){
   // but keep ALL spins in memory for session save, rules, and pool data.
   _restartViewOffset=spins.length-12;
   refreshAll();
+  _lfMirrorLive(); // re-mirror with the restart marker
   alert(t('restart_done'));
 }
 
@@ -1660,6 +1736,8 @@ async function saveSess(){
   alert(t('session_saved')+' ('+spins.length+' '+t('spins')+')');
   // Reset restart view offset for next session
   _restartViewOffset=0;
+  // Commit F: clear live-spin mirror now that the session is safely saved
+  _lfClearLiveMirror();
 }
 
 async function loadSessions(){
@@ -2306,24 +2384,39 @@ function refreshRollingTracker(){
 // Reset hook for newSess() — kept as no-op; sticky line recomputes from scratch on refresh.
 function _resetRollingTracker(){}
 
-// ===== STICKY STACK OFFSET (Commit B) =====
+// ===== STICKY STACK OFFSET (Commit B + Commit E) =====
 // Dynamically compute top-offset for each sticky layer so they stack cleanly on any screen width.
-// Stack: top bar → tabs → actions-wrap → stickyTracker. Each sits flush below the one above it.
+// Stack (top → bottom): .top → .tabs → .actions-wrap → #stickyTracker → #myElPicker → .sc <thead>.
+// Each sits flush below the layer above. Only the scorecard <tbody> scrolls.
 function _adjustStickyStack(){
   const top=document.querySelector('.top');
   const tabs=document.querySelector('.tabs');
   const actions=document.querySelector('.actions-wrap');
   const sticky=document.getElementById('stickyTracker');
+  const myEl=document.getElementById('myElPicker');
+  const thead=document.querySelector('.pane.on .sc thead')||document.querySelector('.sc thead');
   if(!top||!tabs)return;
   const topH=top.offsetHeight||0;
   const tabsH=tabs.offsetHeight||0;
-  tabs.style.top=topH+'px';
+  let cum=topH;
+  tabs.style.top=cum+'px';
+  cum+=tabsH;
   if(actions){
-    actions.style.top=(topH+tabsH)+'px';
-    const actionsH=actions.offsetHeight||0;
-    if(sticky)sticky.style.top=(topH+tabsH+actionsH)+'px';
-  }else if(sticky){
-    sticky.style.top=(topH+tabsH)+'px';
+    actions.style.top=cum+'px';
+    cum+=actions.offsetHeight||0;
+  }
+  if(sticky){
+    sticky.style.top=cum+'px';
+    cum+=sticky.offsetHeight||0;
+  }
+  // #myElPicker is hidden for non-premium tiers — only stack if visible
+  if(myEl && myEl.offsetParent!==null){
+    myEl.style.top=cum+'px';
+    cum+=myEl.offsetHeight||0;
+  }
+  // Scorecard <thead> pins below the My Element row (holds column headers + session-hits row)
+  if(thead){
+    thead.style.top=cum+'px';
   }
 }
 window.addEventListener('load',_adjustStickyStack);
@@ -2331,17 +2424,23 @@ window.addEventListener('resize',_adjustStickyStack);
 // Re-measure after font load and after dynamically injected buttons settle
 setTimeout(_adjustStickyStack,200);
 setTimeout(_adjustStickyStack,800);
-// Watch the sticky layers for any height change (buttons injected later, language switch, etc.)
+// Watch the sticky layers for any height change (buttons injected later, language switch, tab switch, etc.)
 if(typeof ResizeObserver!=='undefined'){
   window.addEventListener('load',function(){
     try{
       const ro=new ResizeObserver(_adjustStickyStack);
-      ['top','tabs','actions-wrap'].forEach(function(sel){
-        const el=document.querySelector('.'+sel);if(el)ro.observe(el);
+      ['.top','.tabs','.actions-wrap','#stickyTracker','#myElPicker'].forEach(function(sel){
+        const el=document.querySelector(sel);if(el)ro.observe(el);
       });
     }catch(e){}
   });
 }
+// Recompute when user switches tabs — scorecard thead top needs to re-apply when the pane becomes visible
+window.addEventListener('click',function(e){
+  if(e.target && e.target.classList && e.target.classList.contains('tab')){
+    setTimeout(_adjustStickyStack,50);
+  }
+});
 
 // ===== MOST BEHIND BANNER =====
 function refreshBehindBanner(){
