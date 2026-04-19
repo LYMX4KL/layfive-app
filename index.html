@@ -564,6 +564,7 @@ button{font-family:inherit}
     <button class="my-el-btn" data-el="Wa" onclick="pickMyElement('Wa')" style="flex:1;min-width:50px;padding:4px 2px;border-radius:5px;border:1px solid #555;background:#1a1a2e;color:var(--wa);font-size:.78em;font-weight:700;cursor:pointer">~ Water</button>
     <button class="my-el-btn" data-el="F"  onclick="pickMyElement('F')"  style="flex:1;min-width:50px;padding:4px 2px;border-radius:5px;border:1px solid #555;background:#1a1a2e;color:var(--f);font-size:.78em;font-weight:700;cursor:pointer">▲ Fire</button>
     <button class="my-el-btn" data-el="E"  onclick="pickMyElement('E')"  style="flex:1;min-width:50px;padding:4px 2px;border-radius:5px;border:1px solid #555;background:#1a1a2e;color:var(--e);font-size:.78em;font-weight:700;cursor:pointer">■ Earth</button>
+    <button class="my-el-none" onclick="pickMyElementNone()" title="Idle — no element selected (session rules stay; element-specific rules off)" style="flex:1;min-width:50px;padding:4px 2px;border-radius:5px;border:1px solid #555;background:#1a1a2e;color:#888;font-size:.78em;font-weight:700;cursor:pointer">○ None</button>
   </div>
   <!-- Scorecard -->
   <div class="sc-wrap">
@@ -1309,13 +1310,19 @@ let _mySelectedElement=localStorage.getItem('lf_my_element')||null;
 
 function pickMyElement(el){
   if(_mySelectedElement===el){
-    // Deselect
+    // Deselect (tap-again toggle — same result as tapping None)
     _mySelectedElement=null;
     localStorage.removeItem('lf_my_element');
   }else{
     _mySelectedElement=el;
     localStorage.setItem('lf_my_element',el);
   }
+  _refreshMyElButtons();
+}
+// Commit C: explicit Idle toggle — clear element selection; element-specific rules go quiet, session rules stay.
+function pickMyElementNone(){
+  _mySelectedElement=null;
+  localStorage.removeItem('lf_my_element');
   _refreshMyElButtons();
 }
 function _refreshMyElButtons(){
@@ -1331,6 +1338,21 @@ function _refreshMyElButtons(){
       btn.style.boxShadow='none';
     }
   });
+  // Commit C: None chip — highlighted when idle (_mySelectedElement null), dim when any element selected
+  var noneBtn=document.querySelector('.my-el-none');
+  if(noneBtn){
+    if(_mySelectedElement==null){
+      noneBtn.style.border='2px solid #d4af37';
+      noneBtn.style.background='#2a2510';
+      noneBtn.style.boxShadow='0 0 6px rgba(212,175,55,.4)';
+      noneBtn.style.color='#d4af37';
+    }else{
+      noneBtn.style.border='1px solid #555';
+      noneBtn.style.background='#1a1a2e';
+      noneBtn.style.boxShadow='none';
+      noneBtn.style.color='#888';
+    }
+  }
 }
 // Expose for layfive-pnl.js
 window._lfGetMyElement=function(){return _mySelectedElement};
