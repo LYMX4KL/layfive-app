@@ -572,15 +572,15 @@ button{font-family:inherit}
     </div>
   </div>
   <div id="restartWarn" style="display:none;margin:6px 0;padding:8px 10px;background:rgba(255,140,0,.18);border:1px solid #ff8c00;border-radius:6px;color:#ffb347;font-size:.85em;text-align:center" data-i18n="restart_warn">⚠ Approaching 60 spins — consider Restart to refresh the pattern.</div>
-  <!-- My Element selector (for lead-loss tracking without P&L) — Commit E: sticky, pinned below status line -->
-  <div id="myElPicker" class="my-el-row" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-    <span style="font-size:.8em;color:#aaa;white-space:nowrap">🎯 My Element:</span>
-    <button class="my-el-btn" data-el="M"  onclick="pickMyElement('M')"  style="flex:1;min-width:50px;padding:4px 2px;border-radius:5px;border:1px solid #555;background:#1a1a2e;color:var(--m);font-size:.78em;font-weight:700;cursor:pointer">● Metal</button>
-    <button class="my-el-btn" data-el="W"  onclick="pickMyElement('W')"  style="flex:1;min-width:50px;padding:4px 2px;border-radius:5px;border:1px solid #555;background:#1a1a2e;color:var(--w);font-size:.78em;font-weight:700;cursor:pointer">▮ Wood</button>
-    <button class="my-el-btn" data-el="Wa" onclick="pickMyElement('Wa')" style="flex:1;min-width:50px;padding:4px 2px;border-radius:5px;border:1px solid #555;background:#1a1a2e;color:var(--wa);font-size:.78em;font-weight:700;cursor:pointer">~ Water</button>
-    <button class="my-el-btn" data-el="F"  onclick="pickMyElement('F')"  style="flex:1;min-width:50px;padding:4px 2px;border-radius:5px;border:1px solid #555;background:#1a1a2e;color:var(--f);font-size:.78em;font-weight:700;cursor:pointer">▲ Fire</button>
-    <button class="my-el-btn" data-el="E"  onclick="pickMyElement('E')"  style="flex:1;min-width:50px;padding:4px 2px;border-radius:5px;border:1px solid #555;background:#1a1a2e;color:var(--e);font-size:.78em;font-weight:700;cursor:pointer">■ Earth</button>
-    <button class="my-el-none" onclick="pickMyElementNone()" title="Idle — no element selected (session rules stay; element-specific rules off)" style="flex:1;min-width:50px;padding:4px 2px;border-radius:5px;border:1px solid #555;background:#1a1a2e;color:#888;font-size:.78em;font-weight:700;cursor:pointer">○ None</button>
+  <!-- My Element selector (for lead-loss tracking without P&L) — Commit E: sticky, pinned below status line. Commit E2: dropped "My Element:" text and shrunk buttons so None fits on same row. -->
+  <div id="myElPicker" class="my-el-row" style="display:flex;align-items:center;gap:3px;flex-wrap:nowrap">
+    <span style="font-size:.9em;flex:0 0 auto" title="My Element">🎯</span>
+    <button class="my-el-btn" data-el="M"  onclick="pickMyElement('M')"  style="flex:1 1 0;min-width:0;padding:4px 1px;border-radius:5px;border:1px solid #555;background:#1a1a2e;color:var(--m);font-size:.72em;font-weight:700;cursor:pointer;white-space:nowrap">● Metal</button>
+    <button class="my-el-btn" data-el="W"  onclick="pickMyElement('W')"  style="flex:1 1 0;min-width:0;padding:4px 1px;border-radius:5px;border:1px solid #555;background:#1a1a2e;color:var(--w);font-size:.72em;font-weight:700;cursor:pointer;white-space:nowrap">▮ Wood</button>
+    <button class="my-el-btn" data-el="Wa" onclick="pickMyElement('Wa')" style="flex:1 1 0;min-width:0;padding:4px 1px;border-radius:5px;border:1px solid #555;background:#1a1a2e;color:var(--wa);font-size:.72em;font-weight:700;cursor:pointer;white-space:nowrap">~ Water</button>
+    <button class="my-el-btn" data-el="F"  onclick="pickMyElement('F')"  style="flex:1 1 0;min-width:0;padding:4px 1px;border-radius:5px;border:1px solid #555;background:#1a1a2e;color:var(--f);font-size:.72em;font-weight:700;cursor:pointer;white-space:nowrap">▲ Fire</button>
+    <button class="my-el-btn" data-el="E"  onclick="pickMyElement('E')"  style="flex:1 1 0;min-width:0;padding:4px 1px;border-radius:5px;border:1px solid #555;background:#1a1a2e;color:var(--e);font-size:.72em;font-weight:700;cursor:pointer;white-space:nowrap">■ Earth</button>
+    <button class="my-el-none" onclick="pickMyElementNone()" title="Idle — no element selected (session rules stay; element-specific rules off)" style="flex:1 1 0;min-width:0;padding:4px 1px;border-radius:5px;border:1px solid #555;background:#1a1a2e;color:#888;font-size:.72em;font-weight:700;cursor:pointer;white-space:nowrap">○ None</button>
   </div>
   <!-- Scorecard -->
   <div class="sc-wrap">
