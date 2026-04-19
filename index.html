@@ -72,8 +72,9 @@ button{font-family:inherit}
 .tab.on{color:var(--gold);border-bottom:2px solid var(--gold);margin-bottom:-2px}
 .pane{display:none}.pane.on{display:block}
 
-/* === ACTIONS BAR (2 rows — Commit A) === */
-.actions-wrap{background:#0a0a1a;margin:0;border-bottom:1px solid #222}
+/* === ACTIONS BAR (2 rows — Commit A; sticky — Commit B) === */
+/* top: refined by _adjustStickyStack() in JS once the real heights are known; CSS fallback covers pre-JS paint */
+.actions-wrap{background:#0a0a1a;margin:0;border-bottom:1px solid #222;position:sticky;top:100px;z-index:90}
 .actions{display:flex;gap:4px;padding:3px 6px;background:#0a0a1a;flex-wrap:wrap;align-items:center}
 .actions.actions-row1{padding-top:4px;padding-bottom:2px}
 .actions.actions-row2{padding-top:2px;padding-bottom:4px}
@@ -544,14 +545,14 @@ button{font-family:inherit}
       <p style="font-size:.75em;color:var(--dim);margin-top:10px;text-align:center" data-i18n="ref_hint">Tap an element above to view its Cruise Roulette layout card.</p>
     </div>
   </div>
-  <div id="stickyTracker" style="position:sticky;top:0;z-index:50;background:#0e0e10;padding:4px 0">
-    <div class="spin-count" id="spinCount">0 spins</div>
-    <div id="rollingTracker" style="display:none;margin:4px 0 0;padding:5px 8px;background:#111820;border:1px solid #333;border-radius:6px;font-size:.78em;gap:8px;align-items:center;flex-wrap:wrap">
-      <span id="rtLeader" style="color:#4ade80" title="2-spin leader in last 18 spins">—</span>
-      <span style="color:#444">|</span>
-      <span id="rtBehind" style="color:#f87171" title="Most behind element in last 18 spins">—</span>
-      <span style="color:#444">|</span>
-      <span id="rtIdle" style="color:#888;display:none" title="Idle — waiting for new leader">⏸ Idle</span>
+  <!-- Sticky status line (Commit B): spins · 2-spin leader (last 18) · most-behind past 30. `top` refined by _adjustStickyStack() in JS; fallback here covers pre-JS paint. -->
+  <div id="stickyTracker" style="position:sticky;top:172px;z-index:80;background:#0e0e10;padding:5px 6px;border-bottom:1px solid #222">
+    <div id="stickyLine" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.82em;line-height:1.25">
+      <span id="slSpins" style="color:var(--gold);font-weight:700">0 spins</span>
+      <span id="slSep1" style="color:#444;display:none">|</span>
+      <span id="slLeader" style="display:none" title="2-spin leader in last 18 spins"></span>
+      <span id="slSep2" style="color:#444;display:none">|</span>
+      <span id="slBehind" style="display:none" title="Most behind element in last 30 spins"></span>
     </div>
   </div>
   <div id="restartWarn" style="display:none;margin:6px 0;padding:8px 10px;background:rgba(255,140,0,.18);border:1px solid #ff8c00;border-radius:6px;color:#ffb347;font-size:.85em;text-align:center" data-i18n="restart_warn">⚠ Approaching 60 spins — consider Restart to refresh the pattern.</div>
@@ -1804,7 +1805,7 @@ function refreshAll(){refreshScorecard();refreshAnalysis();refreshBehindBanner()
 
 function refreshScorecard(){
   const sinceRestart=_restartViewOffset>0?(spins.length-_restartViewOffset):spins.length;
-  document.getElementById('spinCount').textContent=spins.length+' '+t('spins')+(_restartViewOffset>0?' (view: '+sinceRestart+')':'');
+  document.getElementById('slSpins').textContent=spins.length+' '+t('spins')+(_restartViewOffset>0?' (view: '+sinceRestart+')':'');
   // Show restart warning starting at spin 55 since last restart
   const warnEl=document.getElementById('restartWarn');
   if(warnEl){warnEl.style.display=(sinceRestart>=55)?'block':'none';}
@@ -2175,72 +2176,112 @@ function refreshRulesStatus(){
   }
 }
 
-// ===== ROLLING 18-SPIN TRACKER (session-scoped, no restart reset) =====
-// Tracks: (1) any 2-spin leader in last 18, (2) most behind + gap, (3) suggestion when leader loses lead (manual)
-let _rtLastLeader=null; // current 2-spin leader — persists across restarts, resets on new session
+// ===== STICKY STATUS LINE (Commit B) =====
+// Renders leader (last 18) + most-behind (past 30) into #stickyLine cells.
+// Leader cell shows only when an element has ≥2-spin lead over the next element in last 18.
+// Most-behind cell shows the element with the fewest hits in the last 30 spins (ties → hide).
+// No "lost lead" warning — per Kenny's rule: loss fires only on strict overtake, not on gap shrink or tie.
 
 function refreshRollingTracker(){
-  const wrap=document.getElementById('rollingTracker');
-  const leaderEl=document.getElementById('rtLeader');
-  const behindEl=document.getElementById('rtBehind');
-  const idleEl=document.getElementById('rtIdle');
-  if(!wrap||!leaderEl||!behindEl||!idleEl)return;
+  const leaderEl=document.getElementById('slLeader');
+  const behindEl=document.getElementById('slBehind');
+  const sep1=document.getElementById('slSep1');
+  const sep2=document.getElementById('slSep2');
+  if(!leaderEl||!behindEl||!sep1||!sep2)return;
 
-  // Use ALL session spins (not post-restart) — this tracker is session-scoped
-  if(spins.length<12){wrap.style.display='none';return}
-  wrap.style.display='flex';
+  // Helper to count straight+split hits per element across an entries array.
+  function countHits(entries){
+    const c={};
+    ELS.forEach(el=>{c[el]=entries.filter(x=>x.hits[el]==='s'||x.hits[el]==='sp').length});
+    return c;
+  }
 
-  const WINDOW=18;
-  const last18=spins.slice(-WINDOW);
-  const winSize=Math.min(WINDOW,spins.length);
-
-  // Count hits per element in last 18
-  const counts={};
-  ELS.forEach(el=>{counts[el]=last18.filter(x=>x.hits[el]==='s'||x.hits[el]==='sp').length});
-  const sorted=[...ELS].sort((a,b)=>counts[b]-counts[a]);
-  const topEl=sorted[0];
-  const topCount=counts[topEl];
-  const secondCount=counts[sorted[1]]||0;
-  const lead=topCount-secondCount;
-
-  // (1) Any element with 2+ spin lead in rolling 18 — stays as long as lead holds
-  if(lead>=2){
-    const elName=lang==='zh'?L[topEl].cn:L[topEl].n;
-    const elColor=L[topEl].c||'#ccc';
-    _rtLastLeader=topEl;
-    leaderEl.innerHTML='<span style="color:'+elColor+';font-weight:700">\u2605 '+elName+'</span> <span style="color:#aaa">+'+lead+' (last '+winSize+')</span>';
-    // Leader is active — clear any previous suggestion
-    idleEl.style.display='none';
-  }else{
-    // No 2+ leader — check if a leader JUST lost their lead (suggestion trigger)
-    if(_rtLastLeader){
-      const lostName=lang==='zh'?L[_rtLastLeader].cn:L[_rtLastLeader].n;
-      const lostColor=L[_rtLastLeader].c||'#ccc';
-      idleEl.style.display='';
-      idleEl.innerHTML='<span style="color:#f59e0b">\u26a0</span> <span style="color:'+lostColor+';font-weight:600">'+lostName+'</span> <span style="color:#f59e0b">lost 2-spin lead</span> <span style="color:#888">\u2014 consider switching</span>';
-    }else{
-      idleEl.style.display='none';
+  // --- Leader cell: 2-spin leader in last 18 ---
+  let leaderShown=false;
+  if(spins.length>=12){
+    const WIN_LEADER=18;
+    const winLeaderSize=Math.min(WIN_LEADER,spins.length);
+    const last18=spins.slice(-WIN_LEADER);
+    const cL=countHits(last18);
+    const sortedL=[...ELS].sort((a,b)=>cL[b]-cL[a]);
+    const topEl=sortedL[0];
+    const lead=cL[topEl]-(cL[sortedL[1]]||0);
+    if(lead>=2){
+      const elName=lang==='zh'?L[topEl].cn:L[topEl].n;
+      const elColor=L[topEl].c||'#ccc';
+      leaderEl.innerHTML='<span style="color:'+elColor+';font-weight:700">\u2605 '+elName+'</span> <span style="color:#aaa">+'+lead+' (last '+winLeaderSize+')</span>';
+      leaderEl.style.display='';
+      leaderShown=true;
     }
-    _rtLastLeader=null;
-    leaderEl.innerHTML='<span style="color:#888">No 2-spin leader (last '+winSize+')</span>';
   }
+  if(!leaderShown)leaderEl.style.display='none';
 
-  // (2) Most behind element — show exact gap vs leader in rolling 18
-  const bottomEl=sorted[sorted.length-1];
-  const bottomCount=counts[bottomEl];
-  const behindBy=topCount-bottomCount;
-  const bName=lang==='zh'?L[bottomEl].cn:L[bottomEl].n;
-  const bColor=L[bottomEl].c||'#ccc';
-  if(behindBy>0){
-    behindEl.innerHTML='<span style="color:'+bColor+'">'+bName+'</span> <span style="color:#f87171">\u2212'+behindBy+' behind</span>';
-  }else{
-    behindEl.innerHTML='<span style="color:#555">All tied</span>';
+  // --- Most-behind cell: lowest-hit element in last 30 ---
+  let behindShown=false;
+  if(spins.length>=12){
+    const WIN_BEHIND=30;
+    const winBehindSize=Math.min(WIN_BEHIND,spins.length);
+    const last30=spins.slice(-WIN_BEHIND);
+    const cB=countHits(last30);
+    const sortedB=[...ELS].sort((a,b)=>cB[a]-cB[b]); // ascending — lowest first
+    const lowEl=sortedB[0];
+    const lowCount=cB[lowEl];
+    const secondLow=cB[sortedB[1]];
+    // Hide on tie (multiple elements at lowest count)
+    if(lowCount<secondLow){
+      const bName=lang==='zh'?L[lowEl].cn:L[lowEl].n;
+      const bColor=L[lowEl].c||'#ccc';
+      behindEl.innerHTML='<span style="color:#888">Most behind past '+winBehindSize+':</span> <span style="color:'+bColor+';font-weight:700">'+bName+'</span>';
+      behindEl.style.display='';
+      behindShown=true;
+    }
   }
+  if(!behindShown)behindEl.style.display='none';
+
+  // --- Separators: only between visible cells ---
+  // slSpins is always visible. Sep1 shows if any of {leader, behind} shows. Sep2 shows only if BOTH leader and behind show.
+  sep1.style.display=(leaderShown||behindShown)?'':'none';
+  sep2.style.display=(leaderShown&&behindShown)?'':'none';
 }
 
-// Reset rolling tracker on new session (called from newSess)
-function _resetRollingTracker(){
-  _rtLastLeader=null;
+// Reset hook for newSess() — kept as no-op; sticky line recomputes from scratch on refresh.
+function _resetRollingTracker(){}
+
+// ===== STICKY STACK OFFSET (Commit B) =====
+// Dynamically compute top-offset for each sticky layer so they stack cleanly on any screen width.
+// Stack: top bar → tabs → actions-wrap → stickyTracker. Each sits flush below the one above it.
+function _adjustStickyStack(){
+  const top=document.querySelector('.top');
+  const tabs=document.querySelector('.tabs');
+  const actions=document.querySelector('.actions-wrap');
+  const sticky=document.getElementById('stickyTracker');
+  if(!top||!tabs)return;
+  const topH=top.offsetHeight||0;
+  const tabsH=tabs.offsetHeight||0;
+  tabs.style.top=topH+'px';
+  if(actions){
+    actions.style.top=(topH+tabsH)+'px';
+    const actionsH=actions.offsetHeight||0;
+    if(sticky)sticky.style.top=(topH+tabsH+actionsH)+'px';
+  }else if(sticky){
+    sticky.style.top=(topH+tabsH)+'px';
+  }
+}
+window.addEventListener('load',_adjustStickyStack);
+window.addEventListener('resize',_adjustStickyStack);
+// Re-measure after font load and after dynamically injected buttons settle
+setTimeout(_adjustStickyStack,200);
+setTimeout(_adjustStickyStack,800);
+// Watch the sticky layers for any height change (buttons injected later, language switch, etc.)
+if(typeof ResizeObserver!=='undefined'){
+  window.addEventListener('load',function(){
+    try{
+      const ro=new ResizeObserver(_adjustStickyStack);
+      ['top','tabs','actions-wrap'].forEach(function(sel){
+        const el=document.querySelector('.'+sel);if(el)ro.observe(el);
+      });
+    }catch(e){}
+  });
 }
 
 // ===== MOST BEHIND BANNER =====
