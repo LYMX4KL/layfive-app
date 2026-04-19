@@ -526,7 +526,16 @@ button{font-family:inherit}
       <p style="font-size:.75em;color:var(--dim);margin-top:10px;text-align:center" data-i18n="ref_hint">Tap an element above to view its Cruise Roulette layout card.</p>
     </div>
   </div>
-  <div class="spin-count" id="spinCount">0 spins</div>
+  <div id="stickyTracker" style="position:sticky;top:0;z-index:50;background:#0e0e10;padding:4px 0">
+    <div class="spin-count" id="spinCount">0 spins</div>
+    <div id="rollingTracker" style="display:none;margin:4px 0 0;padding:5px 8px;background:#111820;border:1px solid #333;border-radius:6px;font-size:.78em;gap:8px;align-items:center;flex-wrap:wrap">
+      <span id="rtLeader" style="color:#4ade80" title="2-spin leader in last 18 spins">—</span>
+      <span style="color:#444">|</span>
+      <span id="rtBehind" style="color:#f87171" title="Most behind element in last 18 spins">—</span>
+      <span style="color:#444">|</span>
+      <span id="rtIdle" style="color:#888;display:none"></span>
+    </div>
+  </div>
   <div id="restartWarn" style="display:none;margin:6px 0;padding:8px 10px;background:rgba(255,140,0,.18);border:1px solid #ff8c00;border-radius:6px;color:#ffb347;font-size:.85em;text-align:center" data-i18n="restart_warn">⚠ Approaching 60 spins — consider Restart to refresh the pattern.</div>
   <!-- My Element selector (for lead-loss tracking without P&L) -->
   <div id="myElPicker" style="margin:6px 0;padding:6px 8px;background:#111820;border:1px solid #333;border-radius:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -1388,6 +1397,7 @@ function newSess(){
   localStorage.removeItem('lf_my_element');
   _restartViewOffset=0;
   spins=[];
+  _resetRollingTracker();
   refreshAll();
   _refreshMyElButtons();
 }
@@ -1772,7 +1782,7 @@ function showTab(i){
 }
 
 // ===== REFRESH ALL =====
-function refreshAll(){refreshScorecard();refreshAnalysis();refreshBehindBanner();refreshRulesStatus()}
+function refreshAll(){refreshScorecard();refreshAnalysis();refreshBehindBanner();refreshRulesStatus();refreshRollingTracker()}
 
 function refreshScorecard(){
   const sinceRestart=_restartViewOffset>0?(spins.length-_restartViewOffset):spins.length;
@@ -2081,8 +2091,9 @@ function refreshRulesStatus(){
   const sessLead=sessCounts[sortedEls[0]]-(sessCounts[sortedEls[1]]||0);
   const sessLeader=sessLead>=1?sortedEls[0]:null;
 
-  // C1: 30 spins on top of 12 grace
-  const liveSpins=an-GRACE;
+  // C1: 30 spins on top of 12 grace — uses ALL session spins (not post-restart)
+    const c1Total=spins.length;
+    const liveSpins=c1Total-GRACE;
   if(liveSpins>=30){
     badges.push('<span style="background:#c48a1a;color:#000;padding:1px 6px;border-radius:4px;font-weight:700">C1: '+liveSpins+' spins — end session</span>');
   }else if(liveSpins>=25){
@@ -2144,6 +2155,74 @@ function refreshRulesStatus(){
   }else{
     bar.style.display='none';
   }
+}
+
+// ===== ROLLING 18-SPIN TRACKER (session-scoped, no restart reset) =====
+// Tracks: (1) any 2-spin leader in last 18, (2) most behind + gap, (3) suggestion when leader loses lead (manual)
+let _rtLastLeader=null; // current 2-spin leader — persists across restarts, resets on new session
+
+function refreshRollingTracker(){
+  const wrap=document.getElementById('rollingTracker');
+  const leaderEl=document.getElementById('rtLeader');
+  const behindEl=document.getElementById('rtBehind');
+  const idleEl=document.getElementById('rtIdle');
+  if(!wrap||!leaderEl||!behindEl||!idleEl)return;
+
+  // Use ALL session spins (not post-restart) — this tracker is session-scoped
+  if(spins.length<12){wrap.style.display='none';return}
+  wrap.style.display='flex';
+
+  const WINDOW=18;
+  const last18=spins.slice(-WINDOW);
+  const winSize=Math.min(WINDOW,spins.length);
+
+  // Count hits per element in last 18
+  const counts={};
+  ELS.forEach(el=>{counts[el]=last18.filter(x=>x.hits[el]==='s'||x.hits[el]==='sp').length});
+  const sorted=[...ELS].sort((a,b)=>counts[b]-counts[a]);
+  const topEl=sorted[0];
+  const topCount=counts[topEl];
+  const secondCount=counts[sorted[1]]||0;
+  const lead=topCount-secondCount;
+
+  // (1) Any element with 2+ spin lead in rolling 18 — stays as long as lead holds
+  if(lead>=2){
+    const elName=lang==='zh'?L[topEl].cn:L[topEl].n;
+    const elColor=L[topEl].c||'#ccc';
+    _rtLastLeader=topEl;
+    leaderEl.innerHTML='<span style="color:'+elColor+';font-weight:700">\u2605 '+elName+'</span> <span style="color:#aaa">+'+lead+' (last '+winSize+')</span>';
+    // Leader is active — clear any previous suggestion
+    idleEl.style.display='none';
+  }else{
+    // No 2+ leader — check if a leader JUST lost their lead (suggestion trigger)
+    if(_rtLastLeader){
+      const lostName=lang==='zh'?L[_rtLastLeader].cn:L[_rtLastLeader].n;
+      const lostColor=L[_rtLastLeader].c||'#ccc';
+      idleEl.style.display='';
+      idleEl.innerHTML='<span style="color:#f59e0b">\u26a0</span> <span style="color:'+lostColor+';font-weight:600">'+lostName+'</span> <span style="color:#f59e0b">lost 2-spin lead</span> <span style="color:#888">\u2014 consider switching</span>';
+    }else{
+      idleEl.style.display='none';
+    }
+    _rtLastLeader=null;
+    leaderEl.innerHTML='<span style="color:#888">No 2-spin leader (last '+winSize+')</span>';
+  }
+
+  // (2) Most behind element — show exact gap vs leader in rolling 18
+  const bottomEl=sorted[sorted.length-1];
+  const bottomCount=counts[bottomEl];
+  const behindBy=topCount-bottomCount;
+  const bName=lang==='zh'?L[bottomEl].cn:L[bottomEl].n;
+  const bColor=L[bottomEl].c||'#ccc';
+  if(behindBy>0){
+    behindEl.innerHTML='<span style="color:'+bColor+'">'+bName+'</span> <span style="color:#f87171">\u2212'+behindBy+' behind</span>';
+  }else{
+    behindEl.innerHTML='<span style="color:#555">All tied</span>';
+  }
+}
+
+// Reset rolling tracker on new session (called from newSess)
+function _resetRollingTracker(){
+  _rtLastLeader=null;
 }
 
 // ===== MOST BEHIND BANNER =====
