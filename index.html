@@ -128,6 +128,11 @@ button{font-family:inherit}
 .sc .el .el-nm{display:block;font-size:.72em;line-height:1;margin-top:1px}
 .sc .el .el-zh{font-size:1em}
 .sc .rl td{border-bottom:2.5px solid #c00}
+/* === SESSION HITS ROW (Commit D) — totals across ALL session spins; resets only on New Session === */
+.sc .sh-row th{background:#1e1b0f;color:var(--gold);font-size:.95em;font-weight:900;border:1px solid #555;border-top:2px solid var(--gold);padding:3px 2px}
+.sc .sh-row th.sh-lbl{font-size:.7em;color:var(--gold);background:#2a2510;letter-spacing:.5px}
+.sc .sh-row th .sh-m{color:#ccc}.sc .sh-row th .sh-w{color:#6bd86b}.sc .sh-row th .sh-wa{color:#6bbfff}
+.sc .sh-row th .sh-f{color:#ff8866}.sc .sh-row th .sh-e{color:#f0d77a}
 .sc .cM{background:#f0f0f0}.sc .cW{background:#eaf5ea}.sc .cWa{background:#e6f0fb}.sc .cF{background:#fce8e4}.sc .cE{background:#fdf6e0}
 .hM{background:#ddd!important;color:#555!important}.hW{background:#d5ecd5!important;color:#1a6a1a!important}
 .hWa{background:#d4e8f8!important;color:#1a60a0!important}.hF{background:#f5d5cc!important;color:#a02000!important}
@@ -569,10 +574,21 @@ button{font-family:inherit}
   <!-- Scorecard -->
   <div class="sc-wrap">
     <div id="rulesStatusBar" style="display:none;padding:4px 8px;margin:0 0 4px;border-radius:6px;background:#1a1520;border:1px solid #333;font-size:.78em;line-height:1.5;color:#ccc"></div>
-    <table class="sc"><thead><tr>
-      <th class="rn">#</th><th class="sn">Drop</th>
-      <th class="hM el" data-i18n="hdr_metal">● Metal</th><th class="hW el" data-i18n="hdr_wood">▮ Wood</th><th class="hWa el" data-i18n="hdr_water">~ Water</th><th class="hF el" data-i18n="hdr_fire">▲ Fire</th><th class="hE el" data-i18n="hdr_earth">■ Earth</th>
-    </tr></thead><tbody id="scBody"></tbody></table>
+    <table class="sc"><thead>
+      <tr>
+        <th class="rn">#</th><th class="sn">Drop</th>
+        <th class="hM el" data-i18n="hdr_metal">● Metal</th><th class="hW el" data-i18n="hdr_wood">▮ Wood</th><th class="hWa el" data-i18n="hdr_water">~ Water</th><th class="hF el" data-i18n="hdr_fire">▲ Fire</th><th class="hE el" data-i18n="hdr_earth">■ Earth</th>
+      </tr>
+      <!-- Session-hits row (Commit D): totals across ALL session spins; resets on New Session only, not on Restart -->
+      <tr class="sh-row" title="Session hits — total per element across all spins in this session (resets on New Session only)">
+        <th class="rn sh-lbl">Σ</th><th class="sn sh-lbl">hits</th>
+        <th><span class="sh-m" id="shM">0</span></th>
+        <th><span class="sh-w" id="shW">0</span></th>
+        <th><span class="sh-wa" id="shWa">0</span></th>
+        <th><span class="sh-f" id="shF">0</span></th>
+        <th><span class="sh-e" id="shE">0</span></th>
+      </tr>
+    </thead><tbody id="scBody"></tbody></table>
   </div>
   <!-- Most Behind Element Banner -->
   <div class="behind-banner" id="behindBanner">
@@ -1825,9 +1841,30 @@ function showTab(i){
 // ===== REFRESH ALL =====
 function refreshAll(){refreshScorecard();refreshAnalysis();refreshBehindBanner();refreshRulesStatus();refreshRollingTracker()}
 
+// ===== SESSION HITS ROW (Commit D) =====
+// Totals across ALL session spins (ignores _restartViewOffset). Called from refreshScorecard.
+function refreshSessionHitsRow(){
+  const cells={M:'shM',W:'shW',Wa:'shWa',F:'shF',E:'shE'};
+  const totals={};
+  ELS.forEach(function(el){totals[el]=0});
+  for(let i=0;i<spins.length;i++){
+    const sp=spins[i];
+    if(!sp||!sp.hits)continue;
+    ELS.forEach(function(el){
+      const h=sp.hits[el];
+      if(h==='s'||h==='sp')totals[el]++;
+    });
+  }
+  ELS.forEach(function(el){
+    const cell=document.getElementById(cells[el]);
+    if(cell)cell.textContent=totals[el];
+  });
+}
+
 function refreshScorecard(){
   const sinceRestart=_restartViewOffset>0?(spins.length-_restartViewOffset):spins.length;
   document.getElementById('slSpins').textContent=spins.length+' '+t('spins')+(_restartViewOffset>0?' (view: '+sinceRestart+')':'');
+  refreshSessionHitsRow();
   // Show restart warning starting at spin 55 since last restart
   const warnEl=document.getElementById('restartWarn');
   if(warnEl){warnEl.style.display=(sinceRestart>=55)?'block':'none';}
