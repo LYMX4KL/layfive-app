@@ -90,29 +90,48 @@
   function buildUI() {
     var pane = document.getElementById('p0');
     if (!pane) return;
-    if (document.getElementById('gs-bar')) return;
-    var actions = pane.querySelector('.actions');
-    if (!actions) return;
-    var bar = document.createElement('div');
-    bar.id = 'gs-bar';
-    bar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;padding:6px 4px;font-size:.85em;align-items:center';
-    bar.innerHTML =
-      '<button id="gs-start" style="background:#0b5c2a;color:#fff;border:1px solid #3a9a55;border-radius:6px;padding:5px 10px;font-weight:700;cursor:pointer">👥 Start Group</button>' +
-      '<button id="gs-join" style="background:#1e3a8a;color:#fff;border:1px solid #4a6bd4;border-radius:6px;padding:5px 10px;font-weight:700;cursor:pointer">🔗 Join Group</button>' +
-      '<span id="gs-status" style="color:#ccc;margin-left:6px;font-size:.9em"></span>' +
-      '<button id="gs-fork" style="display:none;background:#5a3a8a;color:#fff;border:1px solid #8a6acc;border-radius:6px;padding:5px 10px;font-weight:700;cursor:pointer">📋 Copy & Fork</button>' +
-      '<button id="gs-leave" style="display:none;background:#6b0f0f;color:#fff;border:1px solid #c94a4a;border-radius:6px;padding:5px 10px;font-weight:700;cursor:pointer">Leave</button>';
-    actions.parentNode.insertBefore(bar, actions.nextSibling);
-    document.getElementById('gs-start').onclick = function () {
+    if (document.getElementById('gs-start')) return;
+    // Commit A: inject into Row 2 of the new 2-row action bar.
+    // Falls back to legacy .actions row if actionsRow2 isn't present.
+    var row2 = document.getElementById('actionsRow2') || pane.querySelector('.actions');
+    if (!row2) return;
+    var frag = document.createDocumentFragment();
+    var startBtn = document.createElement('button');
+    startBtn.id = 'gs-start';
+    startBtn.className = 'btn-gs-start';
+    startBtn.textContent = '👥 Start Group';
+    var joinBtn = document.createElement('button');
+    joinBtn.id = 'gs-join';
+    joinBtn.className = 'btn-gs-join';
+    joinBtn.textContent = '🔗 Join Group';
+    var statusSpan = document.createElement('span');
+    statusSpan.id = 'gs-status';
+    var forkBtn = document.createElement('button');
+    forkBtn.id = 'gs-fork';
+    forkBtn.className = 'btn-gs-fork';
+    forkBtn.style.display = 'none';
+    forkBtn.textContent = '📋 Copy & Fork';
+    var leaveBtn = document.createElement('button');
+    leaveBtn.id = 'gs-leave';
+    leaveBtn.className = 'btn-gs-leave';
+    leaveBtn.style.display = 'none';
+    leaveBtn.textContent = 'Leave';
+    frag.appendChild(startBtn);
+    frag.appendChild(joinBtn);
+    frag.appendChild(statusSpan);
+    frag.appendChild(forkBtn);
+    frag.appendChild(leaveBtn);
+    row2.appendChild(frag);
+    startBtn.onclick = function () {
       if (window._lfAuth && !window._lfAuth.gateFeature('group')) return;
       startGroup();
     };
-    document.getElementById('gs-join').onclick = function () {
+    joinBtn.onclick = function () {
       if (window._lfAuth && !window._lfAuth.gateFeature('group')) return;
       joinGroup();
     };
-    document.getElementById('gs-leave').onclick = leaveGroup;
-    document.getElementById('gs-fork').onclick = forkFromGroup;
+    leaveBtn.onclick = leaveGroup;
+    forkBtn.onclick = forkFromGroup;
   }
   function updateUI() {
     var status = document.getElementById('gs-status');
@@ -145,7 +164,11 @@
       c.style.opacity = lock ? 0.55 : '';
       c.style.cursor = lock ? 'not-allowed' : '';
     });
-    var btns = pane.querySelectorAll('.actions button');
+    // Commit A: only disable the data-entry buttons (Row 1). Row 2 buttons
+    // (Reference, P&L, Start/Join/Leave/Fork Group) must remain clickable so
+    // the viewer can still read the reference, check P&L, and leave the group.
+    var row1Sel = '.actions.actions-row1 button, .actions:not(.actions-row2):not(.actions-row1) button';
+    var btns = pane.querySelectorAll(row1Sel);
     btns.forEach(function (b) {
       if (b.classList.contains('btn-ref')) return;
       b.disabled = lock;
