@@ -324,8 +324,8 @@
 
   // ---------- Logout ----------
   async function logout() {
-    if (!_supabase) return;
-    await _supabase.auth.signOut();
+    if (_supabase) await _supabase.auth.signOut();
+    if (typeof window._afterSupabaseLogout === "function") { try { window._afterSupabaseLogout(); } catch(e) { console.error(e); } }
     _user = null;
     _tier = 'free';
     updateUI();
@@ -429,7 +429,42 @@
     showUpgradePrompt: showUpgradePrompt,
     showLoginModal: showLoginModal,
     logout: logout,
-    checkSession: checkSession,
+    checkSession: checkSession,    signIn: async function(email, password) {
+      if (!_supabase) return { error: { message: 'Auth not ready, please refresh' } };
+      try {
+        var r = await _supabase.auth.signInWithPassword({ email: email, password: password });
+        if (!r.error) {
+          await checkSession();
+          if (typeof window._afterSupabaseLogin === 'function') {
+            try { window._afterSupabaseLogin(_user); } catch (e) { console.error('_afterSupabaseLogin failed', e); }
+          }
+        }
+        return r;
+      } catch (e) {
+        return { error: { message: e.message || 'Login failed' } };
+      }
+    },
+    signUp: async function(email, password, name) {
+      if (!_supabase) return { error: { message: 'Auth not ready, please refresh' } };
+      try {
+        return await _supabase.auth.signUp({
+          email: email,
+          password: password,
+          options: { data: { full_name: name || '' } }
+        });
+      } catch (e) {
+        return { error: { message: e.message || 'Signup failed' } };
+      }
+    },
+    resetPassword: async function(email) {
+      if (!_supabase) return { error: { message: 'Auth not ready, please refresh' } };
+      try {
+        return await _supabase.auth.resetPasswordForEmail(email);
+      } catch (e) {
+        return { error: { message: e.message || 'Reset failed' } };
+      }
+    },
+
   };
 
   // ---------- Init ----------
