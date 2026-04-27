@@ -1213,7 +1213,7 @@ function initOffline(){
   refreshSessions();
 }
 
-// ===== AUTH =====
+// ===== AUTH (Supabase migration v3) =====
 let currentUser=null;
 
 function showAuthForm(form){
@@ -1221,39 +1221,58 @@ function showAuthForm(form){
   document.getElementById('auth'+form.charAt(0).toUpperCase()+form.slice(1)).style.display='block';
 }
 
+// Helpers called by layfive-auth.js after Supabase auth state changes
+window._afterSupabaseLogin=function(user){
+  currentUser=user||(window._lfAuth&&window._lfAuth.getUser&&window._lfAuth.getUser());
+  showScreen('screenApp');
+  if(typeof loadSessions==='function')loadSessions();
+  if(typeof fillProfile=='function')fillProfile();
+};
+window._afterSupabaseLogout=function(){
+  currentUser=null;
+  showScreen('screenAuth');
+};
+
 async function doLogin(){
-  const email=document.getElementById('loginEmail').value;
+  const email=document.getElementById('loginEmail').value.trim();
   const pass=document.getElementById('loginPass').value;
-  try{
-    await auth.signInWithEmailAndPassword(email,pass);
-  }catch(e){document.getElementById('loginError').textContent=e.message}
+  const errEl=document.getElementById('loginError');
+  errEl.style.color='';errEl.textContent='';
+  if(!window._lfAuth||!window._lfAuth.signIn){errEl.textContent='Loading, please refresh and try again.';return;}
+  const r=await window._lfAuth.signIn(email,pass);
+  if(r&&r.error)errEl.textContent=r.error.message||'Login failed';
 }
 
 async function doSignup(){
-  const name=document.getElementById('signupName').value;
-  const email=document.getElementById('signupEmail').value;
+  const name=document.getElementById('signupName').value.trim();
+  const email=document.getElementById('signupEmail').value.trim();
   const pass=document.getElementById('signupPass').value;
   const pass2=document.getElementById('signupPass2').value;
-  if(pass!==pass2){document.getElementById('signupError').textContent=t('pass_mismatch');return}
-  try{
-    const cred=await auth.createUserWithEmailAndPassword(email,pass);
-    await cred.user.updateProfile({displayName:name});
-    currentUser=cred.user;
-  }catch(e){document.getElementById('signupError').textContent=e.message}
+  const errEl=document.getElementById('signupError');
+  errEl.style.color='';errEl.textContent='';
+  if(pass!==pass2){errEl.textContent='Passwords do not match';return;}
+  if(!window._lfAuth||!window._lfAuth.signUp){errEl.textContent='Loading, please refresh and try again.';return;}
+  const r=await window._lfAuth.signUp(email,pass,name);
+  if(r&&r.error){errEl.textContent=r.error.message||'Signup failed';return;}
+  errEl.style.color='#2ecc71';
+  errEl.textContent='Check your email to confirm your account, then come back here to log in.';
 }
 
 async function doReset(){
-  const email=document.getElementById('resetEmail').value;
-  try{
-    await auth.sendPasswordResetEmail(email);
-    document.getElementById('resetError').style.color='#2ecc71';
-    document.getElementById('resetError').textContent=lang==='zh'?'重置链接已发送！检查您的邮箱。':'Reset link sent! Check your email.';
-  }catch(e){document.getElementById('resetError').textContent=e.message}
+  const email=document.getElementById('resetEmail').value.trim();
+  const errEl=document.getElementById('resetError');
+  errEl.style.color='';errEl.textContent='';
+  if(!email){errEl.textContent='Please enter your email';return;}
+  if(!window._lfAuth||!window._lfAuth.resetPassword){errEl.textContent='Loading, please refresh and try again.';return;}
+  const r=await window._lfAuth.resetPassword(email);
+  if(r&&r.error){errEl.textContent=r.error.message||'Reset failed';return;}
+  errEl.style.color='#2ecc71';
+  errEl.textContent='Password reset email sent. Check your inbox.';
 }
 
 async function doLogout(){
-  if(firebaseReady) await auth.signOut();
-  showScreen('screenAuth');
+  if(window._lfAuth&&window._lfAuth.logout){await window._lfAuth.logout();}
+  if(window._afterSupabaseLogout)window._afterSupabaseLogout();
 }
 
 function fillProfile(){
@@ -4601,7 +4620,7 @@ function exportReportsExcel(){
 <script src="layfive-rules.js?v=3"></script>
 <script src="layfive-ocr.js?v=9"></script>
 <script src="layfive-learn.js?v=1"></script>
-<script src="layfive-auth.js?v=1"></script>
+<script src="layfive-auth.js?v=2"></script>
 <div id="lf-copyright" style="text-align:center;padding:12px 8px;font-size:.7em;color:#555;border-top:1px solid #222;margin-top:12px">&copy; 2026 LayFive. All rights reserved. | <a href="https://www.layfive.com/disclaimer" target="_blank" style="color:#d4af37;text-decoration:none">Disclaimer</a></div>
 </body>
 </html>
